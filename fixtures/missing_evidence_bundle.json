@@ -1,0 +1,12 @@
+{
+  "case_id": "test_missing",
+  "documents": [
+    {"id": "d1", "filename": "paystub.pdf", "type": "paystub"},
+    {"id": "d3", "filename": "1040.pdf", "type": "form_1040"}
+  ],
+  "claims": [
+    {"id": "paystub.gross", "field": "annualized_gross_ytd", "semantic_type": "gross_income_projected", "value": 138000, "value_type": "currency", "sources": [{"document_id": "d1", "filename": "paystub.pdf", "page": 1, "confidence": 0.95, "field_name": "annualized_gross_ytd"}], "status": "singular"},
+    {"id": "f1040.wages", "field": "line1z_wages", "semantic_type": "gross_income_taxable", "value": 120000, "value_type": "currency", "sources": [{"document_id": "d3", "filename": "1040.pdf", "page": 1, "confidence": 0.95, "field_name": "line1z_wages"}], "status": "singular"}
+  ],
+  "relationships": []
+}

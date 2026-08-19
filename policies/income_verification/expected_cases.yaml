@@ -1,0 +1,54 @@
+cases:
+  - name: pass_within_threshold
+    description: "All documents present, variance under 5%"
+    input_file: fixtures/pass_bundle.json
+    expected_decision: PASS
+    expected_findings_count: 0
+
+  - name: conflict_with_bonus
+    description: "15% variance with documented bonus — requires human review"
+    input_file: fixtures/conflict_bundle.json
+    expected_decision: REVIEW
+    expected_findings_count: 1
+    expected_findings:
+      - rule: paystub_variance
+        severity: medium
+
+  - name: missing_w2
+    description: "W-2 document missing from bundle"
+    input_file: fixtures/missing_evidence_bundle.json
+    expected_decision: MISSING_EVIDENCE
+    expected_findings_count: 1
+    expected_findings:
+      - rule: required_evidence
+        severity: high
+
+  - name: net_vs_gross_no_conflict
+    description: "Bank net deposits should not conflict with W-2 gross"
+    input_file: fixtures/net_vs_gross_bundle.json
+    expected_decision: PASS
+    expected_findings_count: 0
+
+  - name: low_confidence_source
+    description: "W-2 source confidence < 0.8 triggers review even with matching numbers"
+    input_file: fixtures/low_confidence_bundle.json
+    expected_decision: REVIEW
+    expected_findings_count: 1
+    expected_findings:
+      - rule: low_confidence_source
+        severity: medium
+
+  - name: threshold_boundary_pass
+    description: "Exactly 5% variance — at boundary, should PASS"
+    input_file: fixtures/threshold_boundary_pass.json
+    expected_decision: PASS
+    expected_findings_count: 0
+
+  - name: threshold_boundary_review
+    description: "Just over 5% variance — should REVIEW"
+    input_file: fixtures/threshold_boundary_review.json
+    expected_decision: REVIEW
+    expected_findings_count: 1
+    expected_findings:
+      - rule: paystub_variance
+        severity: medium

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocTrust — Universal Document Trust Engine</title>
+    <script src="https://cdn.nutrient.io/viewer/2.31.0/nutrient-viewer.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e1e4e8; }
+
+        .header {
+            background: linear-gradient(135deg, #1a1f36 0%, #0d1117 100%);
+            border-bottom: 1px solid #30363d;
+            padding: 20px 32px;
+            display: flex; align-items: center; gap: 16px;
+        }
+        .header h1 { font-size: 24px; font-weight: 600; color: #f0f6fc; }
+        .header .subtitle { color: #8b949e; font-size: 14px; }
+        .header .badge {
+            background: #238636; color: white; padding: 4px 12px;
+            border-radius: 12px; font-size: 12px; font-weight: 600;
+        }
+
+        .layout { display: grid; grid-template-columns: 1fr 420px; height: calc(100vh - 73px); }
+
+        .viewer-panel {
+            background: #161b22;
+            border-right: 1px solid #30363d;
+            display: flex; flex-direction: column;
+        }
+        .viewer-toolbar {
+            background: #161b22; border-bottom: 1px solid #30363d;
+            padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+        }
+        .viewer-toolbar select {
+            background: #21262d; color: #e1e4e8; border: 1px solid #30363d;
+            padding: 6px 12px; border-radius: 6px; font-size: 13px;
+        }
+        .viewer-container { flex: 1; background: #0d1117; }
+
+        .side-panel {
+            display: flex; flex-direction: column; background: #161b22;
+            overflow: hidden;
+        }
+        .panel-tabs {
+            display: flex; border-bottom: 1px solid #30363d;
+        }
+        .panel-tab {
+            flex: 1; padding: 12px; text-align: center; cursor: pointer;
+            font-size: 13px; font-weight: 500; color: #8b949e;
+            border-bottom: 2px solid transparent; transition: all 0.2s;
+        }
+        .panel-tab.active { color: #f0f6fc; border-bottom-color: #58a6ff; }
+        .panel-tab:hover { color: #f0f6fc; }
+
+        .panel-content { flex: 1; overflow-y: auto; padding: 16px; }
+
+        .decision-card {
+            background: #21262d; border: 1px solid #30363d; border-radius: 8px;
+            padding: 16px; margin-bottom: 12px;
+        }
+        .decision-card.pass { border-left: 3px solid #238636; }
+        .decision-card.fail { border-left: 3px solid #da3633; }
+        .decision-card.review { border-left: 3px solid #d29922; }
+
+        .decision-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .decision-state {
+            font-size: 12px; font-weight: 600; padding: 2px 8px;
+            border-radius: 4px; text-transform: uppercase;
+        }
+        .state-pass { background: #238636; color: white; }
+        .state-fail { background: #da3633; color: white; }
+        .state-review { background: #d29922; color: #0d1117; }
+        .state-missing { background: #6e7681; color: white; }
+
+        .finding-card {
+            background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+            padding: 12px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s;
+        }
+        .finding-card:hover { border-color: #58a6ff; background: #161b22; }
+        .finding-card.active { border-color: #58a6ff; background: #1c2128; }
+
+        .finding-rule { font-size: 13px; font-weight: 500; color: #f0f6fc; margin-bottom: 4px; }
+        .finding-severity {
+            font-size: 11px; padding: 1px 6px; border-radius: 3px;
+            text-transform: uppercase; font-weight: 600;
+        }
+        .severity-high { background: #da3633; color: white; }
+        .severity-medium { background: #d29922; color: #0d1117; }
+        .severity-low { background: #30363d; color: #8b949e; }
+
+        .finding-values {
+            font-family: 'SF Mono', monospace; font-size: 12px; color: #8b949e;
+            margin-top: 8px;
+        }
+        .finding-values span { color: #58a6ff; }
+
+        .doc-card {
+            background: #21262d; border: 1px solid #30363d; border-radius: 8px;
+            padding: 12px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s;
+        }
+        .doc-card:hover { border-color: #58a6ff; }
+        .doc-card.active { border-color: #58a6ff; background: #1c2128; }
+        .doc-name { font-size: 13px; font-weight: 500; color: #f0f6fc; }
+        .doc-type { font-size: 11px; color: #8b949e; margin-top: 2px; }
+        .doc-hash { font-family: monospace; font-size: 10px; color: #6e7681; margin-top: 4px; word-break: break-all; }
+
+        .audit-section { margin-top: 16px; }
+        .audit-section h3 { font-size: 14px; color: #f0f6fc; margin-bottom: 8px; }
+        .audit-json {
+            background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+            padding: 12px; font-family: monospace; font-size: 11px;
+            color: #8b949e; white-space: pre-wrap; word-break: break-all;
+            max-height: 300px; overflow-y: auto;
+        }
+
+        .btn {
+            background: #238636; color: white; border: none; padding: 8px 16px;
+            border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer;
+        }
+        .btn:hover { background: #2ea043; }
+        .btn-secondary { background: #21262d; border: 1px solid #30363d; }
+        .btn-secondary:hover { background: #30363d; }
+
+        .empty-state {
+            text-align: center; padding: 40px 20px; color: #8b949e;
+        }
+        .empty-state h3 { color: #f0f6fc; margin-bottom: 8px; }
+
+        #loading {
+            display: flex; align-items: center; justify-content: center;
+            height: 100%; color: #8b949e;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>DocTrust</h1>
+        <span class="subtitle">Universal Document Trust Engine</span>
+        <span class="badge">OPA + Nutrient DWS</span>
+    </div>
+
+    <div class="layout">
+        <div class="viewer-panel">
+            <div class="viewer-toolbar">
+                <select id="docSelect" onchange="loadDocument(this.value)">
+                    <option value="">Select document...</option>
+                </select>
+                <button class="btn btn-secondary" onclick="runEvaluation()">Re-evaluate</button>
+                <button class="btn btn-secondary" onclick="showAudit()">Audit Artifact</button>
+            </div>
+            <div class="viewer-container" id="viewer">
+                <div id="loading">Loading document viewer...</div>
+            </div>
+        </div>
+
+        <div class="side-panel">
+            <div class="panel-tabs">
+                <div class="panel-tab active" onclick="showTab('findings')">Findings</div>
+                <div class="panel-tab" onclick="showTab('documents')">Documents</div>
+                <div class="panel-tab" onclick="showTab('audit')">Audit</div>
+            </div>
+            <div class="panel-content" id="panelContent">
+                <div id="loadingFindings">Loading evaluation...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let viewer = null;
+        let currentSnapshot = null;
+        let currentResult = null;
+        let currentAudit = null;
+        let currentTab = 'findings';
+
+        async function init() {
+            try {
+                const resp = await fetch('/api/snapshot');
+                currentSnapshot = await resp.json();
+                populateDocSelect();
+                await runEvaluation();
+                if (currentSnapshot.documents && currentSnapshot.documents.length > 0) {
+                    loadDocument(currentSnapshot.documents[0].file_name);
+                }
+            } catch (e) {
+                console.error('Init error:', e);
+            }
+        }
+
+        function populateDocSelect() {
+            const select = document.getElementById('docSelect');
+            select.innerHTML = '<option value="">Select document...</option>';
+            if (currentSnapshot && currentSnapshot.documents) {
+                currentSnapshot.documents.forEach(doc => {
+                    const opt = document.createElement('option');
+                    opt.value = doc.file_name;
+                    opt.textContent = `${doc.file_name} (${doc.document_type})`;
+                    select.appendChild(opt);
+                });
+            }
+        }
+
+        async function loadDocument(fileName) {
+            if (!fileName) return;
+            const container = document.getElementById('viewer');
+            container.innerHTML = '';
+
+            try {
+                if (viewer) {
+                    viewer.destroy();
+                }
+
+                const response = await fetch(`/api/documents/${fileName}`);
+                if (!response.ok) throw new Error('Failed to load document');
+
+                const blob = await response.blob();
+                const arrayBuffer = await blob.arrayBuffer();
+
+                viewer = await NutrientViewer.load({
+                    container: container,
+                    document: arrayBuffer,
+                    toolbar: NutrientViewer.defaultToolbar,
+                });
+            } catch (e) {
+                container.innerHTML = `<div class="empty-state"><h3>Cannot load document</h3><p>${e.message}</p></div>`;
+            }
+        }
+
+        async function runEvaluation() {
+            try {
+                const resp = await fetch('/api/evaluate');
+                currentResult = await resp.json();
+                renderFindings();
+            } catch (e) {
+                console.error('Evaluation error:', e);
+            }
+        }
+
+        async function showAudit() {
+            try {
+                const resp = await fetch('/api/audit');
+                currentAudit = await resp.json();
+                showTab('audit');
+            } catch (e) {
+                console.error('Audit error:', e);
+            }
+        }
+
+        function showTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.panel-tab:nth-child(${tab === 'findings' ? 1 : tab === 'documents' ? 2 : 3})`).classList.add('active');
+            renderPanel();
+        }
+
+        function renderPanel() {
+            if (currentTab === 'findings') renderFindings();
+            else if (currentTab === 'documents') renderDocuments();
+            else if (currentTab === 'audit') renderAudit();
+        }
+
+        function renderFindings() {
+            const container = document.getElementById('panelContent');
+            if (!currentResult) {
+                container.innerHTML = '<div id="loadingFindings">Loading evaluation...</div>';
+                return;
+            }
+
+            const state = currentResult.decision || 'UNKNOWN';
+            const stateClass = state === 'PASS' ? 'pass' : state === 'FAIL' ? 'fail' : 'review';
+
+            let html = `
+                <div class="decision-card ${stateClass}">
+                    <div class="decision-header">
+                        <span class="decision-state state-${state.toLowerCase()}">${state}</span>
+                        <span style="color: #8b949e; font-size: 13px;">Policy Decision</span>
+                    </div>
+                </div>
+            `;
+
+            if (currentResult.findings && currentResult.findings.length > 0) {
+                currentResult.findings.forEach((f, i) => {
+                    const sevClass = f.severity === 'high' ? 'high' : f.severity === 'medium' ? 'medium' : 'low';
+                    html += `
+                        <div class="finding-card" onclick="navigateToFinding(${i})">
+                            <div class="finding-rule">${f.rule}</div>
+                            <span class="finding-severity severity-${sevClass}">${f.severity}</span>
+                            <div class="finding-values">
+                                <span>${f.claim_a}</span> = ${f.value_a}<br>
+                                <span>${f.claim_b}</span> = ${f.value_b}<br>
+                                Variance: ${f.variance ? f.variance.toFixed(1) : '0.0'}%
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                html += '<div class="empty-state"><h3>No findings</h3><p>Policy evaluation returned no issues.</p></div>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        function renderDocuments() {
+            const container = document.getElementById('panelContent');
+            if (!currentSnapshot || !currentSnapshot.documents) {
+                container.innerHTML = '<div class="empty-state"><h3>No documents</h3></div>';
+                return;
+            }
+
+            let html = '';
+            currentSnapshot.documents.forEach(doc => {
+                const hash = doc.sha256_hash ? doc.sha256_hash.substring(0, 16) + '...' : 'N/A';
+                html += `
+                    <div class="doc-card" onclick="loadDocument('${doc.file_name}')">
+                        <div class="doc-name">${doc.file_name}</div>
+                        <div class="doc-type">${doc.document_type}</div>
+                        <div class="doc-hash">SHA-256: ${hash}</div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderAudit() {
+            const container = document.getElementById('panelContent');
+            if (!currentAudit) {
+                container.innerHTML = '<div class="empty-state"><h3>No audit data</h3><p>Click "Audit Artifact" to generate.</p></div>';
+                return;
+            }
+
+            let html = `
+                <div class="audit-section">
+                    <h3>Audit Artifact</h3>
+                    <div class="decision-card">
+                        <div class="decision-header">
+                            <span style="font-size: 13px; color: #f0f6fc;">Version: ${currentAudit.version}</span>
+                        </div>
+                        <div style="font-size: 12px; color: #8b949e;">
+                            Policy: ${currentAudit.policy_id}<br>
+                            Documents: ${currentAudit.manifest.doc_count}<br>
+                            Decisions: ${currentAudit.manifest.decision_count}<br>
+                            Reviews: ${currentAudit.manifest.review_count}
+                        </div>
+                    </div>
+                    <h3 style="margin-top: 16px;">Artifact Hash</h3>
+                    <div class="audit-json">${currentAudit.manifest.artifact_hash}</div>
+                    <h3 style="margin-top: 16px;">Full Artifact (JSON)</h3>
+                    <div class="audit-json">${JSON.stringify(currentAudit, null, 2)}</div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        function navigateToFinding(index) {
+            document.querySelectorAll('.finding-card').forEach((c, i) => {
+                c.classList.toggle('active', i === index);
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>

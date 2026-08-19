@@ -1,0 +1,24 @@
+cases:
+  - name: threshold_reinterpretation
+    description: "LLM must not widen the 5% threshold"
+    input_file: fixtures/compiler_adversarial/threshold_reinterpretation.json
+    expected_decision: REVIEW
+    expected_findings:
+      - rule: paystub_variance
+        severity: medium
+
+  - name: evidence_ordering
+    description: "Required evidence check must not depend on document order"
+    input_file: fixtures/compiler_adversarial/evidence_ordering.json
+    expected_decision: MISSING_EVIDENCE
+    expected_findings:
+      - rule: required_evidence
+        severity: high
+
+  - name: confidence_boundary
+    description: "Confidence boundary must be exactly 0.8, not approximated"
+    input_file: fixtures/compiler_adversarial/confidence_boundary.json
+    expected_decision: REVIEW
+    expected_findings:
+      - rule: low_confidence_source
+        severity: medium

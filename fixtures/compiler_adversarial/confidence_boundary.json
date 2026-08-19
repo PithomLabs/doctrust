@@ -1,0 +1,14 @@
+{
+  "case_id": "adversarial_confidence_boundary",
+  "documents": [
+    {"id": "d1", "filename": "paystub.pdf", "type": "paystub"},
+    {"id": "d2", "filename": "w2.pdf", "type": "w2"},
+    {"id": "d3", "filename": "1040.pdf", "type": "form_1040"}
+  ],
+  "claims": [
+    {"id": "paystub.gross", "field": "annualized_gross_ytd", "semantic_type": "gross_income_projected", "value": 105000, "value_type": "currency", "sources": [{"document_id": "d1", "filename": "paystub.pdf", "page": 1, "confidence": 0.95, "field_name": "annualized_gross_ytd"}], "status": "singular"},
+    {"id": "w2.wages", "field": "wages_tips_other_compensation", "semantic_type": "gross_income_taxable", "value": 100000, "value_type": "currency", "sources": [{"document_id": "d2", "filename": "w2.pdf", "page": 1, "confidence": 0.79, "field_name": "wages_tips_other_compensation"}], "status": "singular"},
+    {"id": "f1040.wages", "field": "line1z_wages", "semantic_type": "gross_income_taxable", "value": 100000, "value_type": "currency", "sources": [{"document_id": "d3", "filename": "1040.pdf", "page": 1, "confidence": 0.95, "field_name": "line1z_wages"}], "status": "singular"}
+  ],
+  "relationships": []
+}
