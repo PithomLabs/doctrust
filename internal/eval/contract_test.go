@@ -68,11 +68,7 @@ func TestFactsContract_Fixture(t *testing.T) {
 	}
 
 	// Run checks
-	runner := NewRunner(map[string]Check{
-		"gross_income_consistency":     &GrossIncomeConsistencyCheck{},
-		"required_documents":           &RequiredDocumentsCheck{},
-		"net_vs_gross_incomparability": &NetVsGrossIncomparabilityCheck{},
-	})
+	runner := NewRunner(DefaultRegistry().All())
 
 	// Test gross_income_consistency — should be REVIEW (15% variance > 5% tolerance)
 	result := runner.checks["gross_income_consistency"].Evaluate(allFacts, map[string]any{

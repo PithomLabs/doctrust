@@ -14,6 +14,7 @@ import (
 
 type LLMClient interface {
 	Generate(ctx context.Context, prompt string) (string, error)
+	GenerateWithSystem(ctx context.Context, systemPrompt, userPrompt string) (string, error)
 }
 
 type OpenRouterClient struct {
@@ -110,7 +111,52 @@ Constraints:
 		result, err := c.doRequest(ctx, body)
 		if err != nil {
 			lastErr = err
-			if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "500") {
+			if isRetryableError(err) {
+				continue
+			}
+			return "", err
+		}
+		return result, nil
+	}
+
+	return "", fmt.Errorf("LLM failed after 3 attempts: %w", lastErr)
+}
+
+// GenerateWithSystem sends an explicit system prompt and user prompt.
+func (c *OpenRouterClient) GenerateWithSystem(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	if c.apiKey == "" {
+		return "", fmt.Errorf("OPENROUTER_API_KEY not set")
+	}
+
+	reqBody := openRouterRequest{
+		Model: c.model,
+		Messages: []openRouterMsg{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: userPrompt},
+		},
+		ResponseFmt: &responseFormat{Type: "json_object"},
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("marshal request: %w", err)
+	}
+
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
+			select {
+			case <-ctx.Done():
+				return "", ctx.Err()
+			case <-time.After(backoff):
+			}
+		}
+
+		result, err := c.doRequest(ctx, body)
+		if err != nil {
+			lastErr = err
+			if isRetryableError(err) {
 				continue
 			}
 			return "", err
@@ -165,4 +211,22 @@ func (c *OpenRouterClient) doRequest(ctx context.Context, body []byte) (string, 
 	}
 
 	return apiResp.Choices[0].Message.Content, nil
+}
+
+// isRetryableError determines if an error is transient and worth retrying.
+func isRetryableError(err error) bool {
+	errStr := err.Error()
+	// HTTP retryable status codes
+	if strings.Contains(errStr, "429") || strings.Contains(errStr, "500") ||
+		strings.Contains(errStr, "502") || strings.Contains(errStr, "503") {
+		return true
+	}
+	// Network errors (connection refused, reset, etc.)
+	if strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "connection reset") ||
+		strings.Contains(errStr, "EOF") ||
+		strings.Contains(errStr, "i/o timeout") {
+		return true
+	}
+	return false
 }

@@ -305,11 +305,7 @@ func TestRunAllScenarios(t *testing.T) {
 	t.Logf("loaded %d scenarios", len(scenarios))
 
 	// Build check registry
-	checks := map[string]Check{
-		"gross_income_consistency":     &GrossIncomeConsistencyCheck{},
-		"required_documents":           &RequiredDocumentsCheck{},
-		"net_vs_gross_incomparability": &NetVsGrossIncomparabilityCheck{},
-	}
+	checks := DefaultRegistry().All()
 	runner := NewRunner(checks)
 
 	// Run all scenarios

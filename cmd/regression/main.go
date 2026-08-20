@@ -68,11 +68,7 @@ func main() {
 	}
 
 	// Register checks
-	checks := map[string]eval.Check{
-		"gross_income_consistency":     &eval.GrossIncomeConsistencyCheck{},
-		"required_documents":           &eval.RequiredDocumentsCheck{},
-		"net_vs_gross_incomparability": &eval.NetVsGrossIncomparabilityCheck{},
-	}
+	checks := eval.DefaultRegistry().All()
 
 	// Build runners
 	baselineRunner := eval.NewRunner(checks)

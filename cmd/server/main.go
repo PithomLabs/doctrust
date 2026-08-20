@@ -62,12 +62,7 @@ func main() {
 	loadedRuleset = rs
 
 	// Build check registry
-	checks := map[string]eval.Check{
-		"gross_income_consistency":     &eval.GrossIncomeConsistencyCheck{},
-		"required_documents":           &eval.RequiredDocumentsCheck{},
-		"net_vs_gross_incomparability": &eval.NetVsGrossIncomparabilityCheck{},
-	}
-	evalRunner = eval.NewRunner(checks)
+	evalRunner = eval.NewRunner(eval.DefaultRegistry().All())
 
 	// Load snapshot for policy hash
 	snapshotPath := filepath.Join(snapshotDir, "evidence_snapshot.json")
