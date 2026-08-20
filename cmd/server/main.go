@@ -51,25 +51,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Load ruleset via registry (promoted version), fallback to manual path
+	// Load ruleset via registry (promoted version) — no fallback
 	registry := eval.NewRegistry("rulesets")
 	rs, err := registry.LoadPromoted(*domain)
 	if err != nil {
-		// Fallback: try loading v1.yaml directly
-		rulesetPath := filepath.Join("rulesets", *domain, "v1.yaml")
-		if _, statErr := os.Stat(rulesetPath); statErr != nil {
-			fmt.Fprintf(os.Stderr, "Error: no promoted ruleset and v1.yaml not found for domain %s\n", *domain)
-			os.Exit(1)
-		}
-		rs, err = eval.LoadRuleset(rulesetPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error loading ruleset: %v\n", err)
-			os.Exit(1)
-		}
-		log.Printf("Loaded ruleset from fallback path: %s", rulesetPath)
-	} else {
-		log.Printf("Loaded promoted ruleset: %s v%s", rs.ID, rs.Version)
+		fmt.Fprintf(os.Stderr, "Error: no promoted ruleset found for domain %s: %v\n", *domain, err)
+		os.Exit(1)
 	}
+	log.Printf("Loaded promoted ruleset: %s v%s", rs.ID, rs.Version)
 	loadedRuleset = rs
 
 	// Build check registry
@@ -194,36 +183,20 @@ func handleEvaluate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build claimSources for UI
-	claimSources := make(map[string][]eval.SourceRef)
-	for _, c := range snapshot.Claims {
-		var refs []eval.SourceRef
-		for _, s := range c.Sources {
-			var bboxInt []int
-			if s.BBox != nil {
-				bboxInt = make([]int, len(s.BBox))
-				for i, v := range s.BBox {
-					bboxInt[i] = int(v)
-				}
-			}
-			refs = append(refs, eval.SourceRef{
-				DocumentID: s.DocumentID,
-				Filename:   s.Filename,
-				Page:       s.Page,
-				Bbox:       bboxInt,
-				Confidence: s.Confidence,
-				FieldName:  s.FieldName,
-			})
-		}
-		claimSources[c.ID] = refs
-	}
-
 	// Compute final decision using aggregator
 	agg := &eval.DecisionAggregator{}
 	finalStatus, _ := agg.Aggregate(results)
 
+	// Populate EnrichedFinding.Sources directly from Result.Evidence
 	enriched := eval.EnrichedResult{Decision: finalStatus}
 	for _, res := range results {
+		var sources []eval.SourceRef
+		for _, ev := range res.Evidence {
+			sources = append(sources, eval.SourceRef{
+				Filename:  ev.SourceDoc,
+				FieldName: ev.Field,
+			})
+		}
 		ef := eval.EnrichedFinding{
 			Rule:     res.CheckID,
 			Severity: string(res.Severity),
@@ -231,7 +204,7 @@ func handleEvaluate(w http.ResponseWriter, r *http.Request) {
 			ClaimB:   "",
 			ValueA:   nil,
 			ValueB:   nil,
-			Sources:  claimSources[res.CheckID],
+			Sources:  sources,
 		}
 		enriched.Findings = append(enriched.Findings, ef)
 	}

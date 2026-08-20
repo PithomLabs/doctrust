@@ -1,0 +1,26 @@
+{
+  "id": "income_verification",
+  "version": "2",
+  "checks": [
+    {
+      "ID": "gross_income_consistency",
+      "Version": "1.0",
+      "Params": {
+        "bonus_field": "bonus_compensation",
+        "tolerance": 0.03
+      }
+    },
+    {
+      "ID": "required_documents",
+      "Version": "1.0",
+      "Params": null
+    },
+    {
+      "ID": "net_vs_gross_incomparability",
+      "Version": "1.0",
+      "Params": null
+    }
+  ],
+  "hash": "c5f7a1fd9c7174a900bdf5fae01192563ee1dab7134064518bb15a9946239d24",
+  "promoted_at": "2026-08-20T03:21:37.602065102Z"
+}

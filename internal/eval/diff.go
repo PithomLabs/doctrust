@@ -25,11 +25,13 @@ func DiffResults(after, before Result) *ScenarioDiff {
 		return nil
 	}
 	return &ScenarioDiff{
-		Changed:         true,
-		StatusChanged:   after.Status != before.Status,
-		SeverityChanged: after.Severity != before.Severity,
-		ReasonChanged:   after.Reason != before.Reason,
-		EvidenceChanged: !evidenceEqual(after.Evidence, before.Evidence),
+		Before:           before,
+		After:            after,
+		Changed:          true,
+		StatusChanged:    after.Status != before.Status,
+		SeverityChanged:  after.Severity != before.Severity,
+		ReasonChanged:    after.Reason != before.Reason,
+		EvidenceChanged:  !evidenceEqual(after.Evidence, before.Evidence),
 	}
 }
 

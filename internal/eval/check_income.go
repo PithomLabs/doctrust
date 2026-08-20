@@ -83,14 +83,13 @@ func getAllFacts(facts Facts, key string) []Fact {
 }
 
 // normalizeDocType normalizes a source document name to a canonical type.
-// Uses exact matching after normalization, not substring contains.
+// Uses exact canonical matches only — no substring fallback.
 func normalizeDocType(sourceDoc string) string {
 	lower := strings.ToLower(strings.TrimSpace(sourceDoc))
 	// Strip file extension
 	if idx := strings.LastIndex(lower, "."); idx > 0 {
 		lower = lower[:idx]
 	}
-	// Exact canonical matches
 	switch lower {
 	case "paystub", "pay_stub", "paystub_extractor":
 		return "paystub"
@@ -99,17 +98,6 @@ func normalizeDocType(sourceDoc string) string {
 	case "form_1040", "1040", "irs_1040", "1040_form":
 		return "form_1040"
 	case "bank_statement", "bankstatement", "bank_stmt":
-		return "bank_statement"
-	}
-	// Substring fallback for common patterns
-	switch {
-	case strings.Contains(lower, "paystub") || strings.Contains(lower, "pay_stub"):
-		return "paystub"
-	case strings.Contains(lower, "w2") || strings.Contains(lower, "w-2") || strings.Contains(lower, "w_2"):
-		return "w2"
-	case strings.Contains(lower, "1040"):
-		return "form_1040"
-	case strings.Contains(lower, "bank"):
 		return "bank_statement"
 	}
 	return sourceDoc

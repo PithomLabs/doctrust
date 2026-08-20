@@ -30,8 +30,12 @@ scenarios:
       evidence:
         - field: "net_cash_flow"
           source_doc: "bank_statement"
+          source_span: "page=1;bbox=[207,189,45,8]"
+          confidence: 0.95
         - field: "gross_income_taxable"
           source_doc: "w2"
+          source_span: "page=1;bbox=[224,120,44,8]"
+          confidence: 0.95
 
   - name: "missing_bank_statement"
     origin: "real_fixture"
@@ -58,6 +62,8 @@ scenarios:
       evidence:
         - field: "gross_income_taxable"
           source_doc: "w2"
+          source_span: "page=1;bbox=[224,120,44,8]"
+          confidence: 0.95
 
   - name: "missing_gross_income"
     origin: "human_adversarial"
@@ -78,3 +84,5 @@ scenarios:
       evidence:
         - field: "net_cash_flow"
           source_doc: "bank_statement"
+          source_span: "page=1;bbox=[207,189,45,8]"
+          confidence: 0.95

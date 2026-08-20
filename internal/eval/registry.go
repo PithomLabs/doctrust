@@ -110,7 +110,7 @@ func (reg *Registry) Promote(rs Ruleset) error {
 
 	nextVersion := maxVersion + 1
 	promotedVersion := fmt.Sprintf("v%d", nextVersion)
-	rs.Version = promotedVersion
+	rs.Version = fmt.Sprintf("%d", nextVersion) // version field is the number, filename has v prefix
 
 	promotedPath := filepath.Join(dir, promotedVersion+".yaml")
 	data, err := yaml.Marshal(rs)

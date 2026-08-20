@@ -37,8 +37,12 @@ scenarios:
       evidence:
         - field: "gross_income_projected"
           source_doc: "paystub"
+          source_span: "page=1;bbox=[508,274,50,8]"
+          confidence: 0.95
         - field: "gross_income_taxable"
           source_doc: "w2"
+          source_span: "page=1;bbox=[224,120,44,8]"
+          confidence: 0.95
 
   - name: "conflict_with_bonus"
     origin: "real_fixture"
@@ -78,10 +82,16 @@ scenarios:
       evidence:
         - field: "gross_income_projected"
           source_doc: "paystub"
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
         - field: "gross_income_taxable"
           source_doc: "w2"
+          source_span: "page=1;bbox=[608,301,335,51]"
+          confidence: 0.95
         - field: "bonus_compensation"
           source_doc: "paystub"
+          source_span: "page=1;bbox=[1418,803,139,30]"
+          confidence: 0.95
 
   - name: "threshold_boundary_pass"
     origin: "real_fixture"
@@ -115,8 +125,12 @@ scenarios:
       evidence:
         - field: "gross_income_projected"
           source_doc: "paystub"
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
         - field: "gross_income_taxable"
           source_doc: "w2"
+          source_span: "page=1;bbox=[608,301,335,51]"
+          confidence: 0.95
 
   - name: "threshold_boundary_review"
     origin: "real_fixture"
@@ -150,8 +164,12 @@ scenarios:
       evidence:
         - field: "gross_income_projected"
           source_doc: "paystub"
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
         - field: "gross_income_taxable"
           source_doc: "w2"
+          source_span: "page=1;bbox=[608,301,335,51]"
+          confidence: 0.95
 
   - name: "high_variance_no_bonus"
     origin: "human_adversarial"
@@ -185,8 +203,12 @@ scenarios:
       evidence:
         - field: "gross_income_projected"
           source_doc: "paystub"
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
         - field: "gross_income_taxable"
           source_doc: "w2"
+          source_span: "page=1;bbox=[608,301,335,51]"
+          confidence: 0.95
 
   - name: "missing_w2"
     origin: "real_fixture"
@@ -220,7 +242,13 @@ scenarios:
       evidence:
         - field: "gross_income_projected"
           source_doc: "paystub"
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
         - field: "gross_income_taxable"
           source_doc: "1040"
+          source_span: "page=1;bbox=[1126,714,156,36]"
+          confidence: 0.95
         - field: "bonus_compensation"
           source_doc: "paystub"
+          source_span: "page=1;bbox=[1418,803,139,30]"
+          confidence: 0.95

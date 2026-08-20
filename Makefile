@@ -1,4 +1,4 @@
-.PHONY: build run test ingest clean setup demo-pdfs check-policy test-policy validate-fixtures eval compile-policy test-compiler server
+.PHONY: build run test ingest clean setup demo-pdfs check-policy test-policy validate-fixtures eval compile-policy test-compiler server regression promote registry
 
 # Build all binaries
 build:
@@ -7,6 +7,9 @@ build:
 	go build -o bin/validate-fixtures ./cmd/validate-fixtures/
 	go build -o bin/compile-policy ./cmd/compile-policy/
 	go build -o bin/server ./cmd/server/
+	go build -o bin/regression ./cmd/regression/
+	go build -o bin/promote ./cmd/promote/
+	go build -o bin/registry ./cmd/registry/
 
 # Run the ingest pipeline on demo documents
 run: build
@@ -48,10 +51,39 @@ test-compiler:
 server: build
 	bin/server --dir demo/income_verification --policy policies/income_verification/policy.rego
 
+# Run regression: compare candidate ruleset against current promoted
+regression: build
+	bin/regression --domain income_verification
+
+# Run regression with explicit draft
+regression-draft: build
+	bin/regression --domain income_verification --draft rulesets/income_verification/working.yaml
+
+# Run regression in legacy mode (scenario-level params)
+regression-legacy: build
+	bin/regression --domain income_verification --scenario-params
+
+# Promote working draft to next immutable version
+promote: build
+	bin/promote --domain income_verification
+
+# Dry-run promotion (validate only)
+promote-dry: build
+	bin/promote --domain income_verification --dry-run
+
+# Show registry state
+registry: build
+	bin/registry
+
+# Show registry for specific domain
+registry-domain: build
+	bin/registry --domain income_verification
+
 # Clean build artifacts
 clean:
 	rm -rf bin/ compiled/
 	rm -f demo/income_verification/evidence_snapshot.json
+	rm -f rulesets/*/working.yaml
 
 # Setup: download dependencies
 setup:

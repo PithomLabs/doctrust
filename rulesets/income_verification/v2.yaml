@@ -1,0 +1,12 @@
+id: income_verification
+version: "2"
+checks:
+    - id: gross_income_consistency
+      version: "1.0"
+      params:
+        bonus_field: bonus_compensation
+        tolerance: 0.03
+    - id: required_documents
+      version: "1.0"
+    - id: net_vs_gross_incomparability
+      version: "1.0"
