@@ -75,6 +75,17 @@ func (r *Runner) RunRuleset(ctx context.Context, rs Ruleset, facts Facts) ([]Res
 	return results, nil
 }
 
+// Evaluate runs all checks in the ruleset and returns the canonical Decision.
+// This is the production terminal output of the engine.
+func (r *Runner) Evaluate(ctx context.Context, rs Ruleset, f Facts) (Decision, error) {
+	results, err := r.RunRuleset(ctx, rs, f)
+	if err != nil {
+		return Decision{}, err
+	}
+	agg := &DecisionAggregator{}
+	return agg.Decide(results, rs), nil
+}
+
 func CompareScenario(s Scenario, actual Result) ScenarioResult {
 	expected := s.Expected
 	diff := DiffResults(actual, expected)

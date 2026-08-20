@@ -43,15 +43,6 @@ type Result struct {
 	Metrics  map[string]any        `json:"metrics,omitempty" yaml:"metrics,omitempty"`
 }
 
-type SourceRef struct {
-	DocumentID string    `json:"document_id"`
-	Filename   string    `json:"filename"`
-	Page       int       `json:"page"`
-	Bbox       []int     `json:"bbox,omitempty"`
-	Confidence float64   `json:"confidence"`
-	FieldName  string    `json:"field_name,omitempty"`
-}
-
 type CheckRef struct {
 	ID      string         `yaml:"id"`
 	Version string         `yaml:"version"`
@@ -68,19 +59,13 @@ type Aggregator interface {
 	Aggregate([]Result) (status string, blockedBy []string)
 }
 
-type EnrichedFinding struct {
-	Rule     string      `json:"rule"`
-	Severity string       `json:"severity"`
-	ClaimA   string       `json:"claim_a"`
-	ClaimB   string       `json:"claim_b"`
-	ValueA   interface{}  `json:"value_a"`
-	ValueB   interface{}  `json:"value_b"`
-	Sources  []SourceRef  `json:"sources,omitempty"`
-}
-
-type EnrichedResult struct {
-	Decision string          `json:"decision"`
-	Findings []EnrichedFinding `json:"findings"`
+// Decision is the canonical terminal output of the evaluation engine.
+// It contains the ruleset provenance, aggregate status, and all check results.
+type Decision struct {
+	RulesetID      string   `json:"ruleset_id" yaml:"ruleset_id"`
+	RulesetVersion string   `json:"ruleset_version" yaml:"ruleset_version"`
+	Status         Status   `json:"status" yaml:"status"`
+	Results        []Result `json:"results" yaml:"results"`
 }
 
 type Scenario struct {

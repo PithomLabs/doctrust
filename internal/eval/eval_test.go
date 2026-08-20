@@ -60,6 +60,58 @@ func TestAggregator(t *testing.T) {
 	}
 }
 
+func TestDecide(t *testing.T) {
+	agg := &DecisionAggregator{}
+
+	// Test Decide with mixed results
+	results := []Result{
+		{CheckID: "a", Status: StatusPass, Severity: SeverityInfo},
+		{CheckID: "b", Status: StatusReview, Severity: SeverityWarning},
+	}
+	rs := Ruleset{ID: "test_domain", Version: "3"}
+	decision := agg.Decide(results, rs)
+
+	if decision.RulesetID != "test_domain" {
+		t.Errorf("RulesetID: got %s, want test_domain", decision.RulesetID)
+	}
+	if decision.RulesetVersion != "3" {
+		t.Errorf("RulesetVersion: got %s, want 3", decision.RulesetVersion)
+	}
+	if decision.Status != StatusReview {
+		t.Errorf("Status: got %s, want REVIEW", decision.Status)
+	}
+	if len(decision.Results) != 2 {
+		t.Errorf("Results: got %d, want 2", len(decision.Results))
+	}
+
+	// Verify defensive copy: mutating original should not affect Decision
+	results[0].CheckID = "mutated"
+	if decision.Results[0].CheckID == "mutated" {
+		t.Error("Decision.Results should be a defensive copy, not a reference to original slice")
+	}
+
+	// Test Decide with all PASS
+	passResults := []Result{
+		{CheckID: "x", Status: StatusPass, Severity: SeverityInfo},
+	}
+	passDecision := agg.Decide(passResults, Ruleset{ID: "prod", Version: "1"})
+	if passDecision.Status != StatusPass {
+		t.Errorf("all PASS: got %s, want PASS", passDecision.Status)
+	}
+	if passDecision.RulesetID != "prod" {
+		t.Errorf("RulesetID: got %s, want prod", passDecision.RulesetID)
+	}
+
+	// Test Decide with FAIL
+	failResults := []Result{
+		{CheckID: "f", Status: StatusFail, Severity: SeverityBlocking},
+	}
+	failDecision := agg.Decide(failResults, Ruleset{ID: "fail_domain", Version: "2"})
+	if failDecision.Status != StatusFail {
+		t.Errorf("FAIL: got %s, want FAIL", failDecision.Status)
+	}
+}
+
 func TestDiffResults(t *testing.T) {
 	before := Result{Status: StatusPass, Severity: SeverityInfo, Reason: "ok"}
 	after := Result{Status: StatusPass, Severity: SeverityInfo, Reason: "ok"}

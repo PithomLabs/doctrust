@@ -61,12 +61,8 @@ func main() {
 	registry := eval.NewRegistry("rulesets")
 	rs, err := registry.LoadPromoted("income_verification")
 	if err != nil {
-		// Fallback
-		rs, err = eval.LoadRuleset("rulesets/income_verification/v1.yaml")
-		if err != nil {
-			fmt.Printf("Error loading ruleset: %v\n", err)
-			os.Exit(1)
-		}
+		fmt.Printf("Error loading promoted ruleset: %v\n", err)
+		os.Exit(1)
 	}
 
 	checks := map[string]eval.Check{
@@ -96,19 +92,16 @@ func main() {
 		}
 	}
 
-	results, err := runner.RunRuleset(context.Background(), rs, f)
+	decision, err := runner.Evaluate(context.Background(), rs, f)
 	if err != nil {
 		fmt.Printf("internal/eval error: %v\n", err)
 		os.Exit(1)
 	}
 
-	agg := &eval.DecisionAggregator{}
-	evalDecision, _ := agg.Aggregate(results)
-
 	fmt.Printf("\n=== internal/eval Result ===\n")
-	fmt.Printf("Decision: %s\n", evalDecision)
-	fmt.Printf("Findings: %d\n", len(results))
-	for _, res := range results {
+	fmt.Printf("Decision: %s\n", decision.Status)
+	fmt.Printf("Findings: %d\n", len(decision.Results))
+	for _, res := range decision.Results {
 		fmt.Printf("  - Rule: %s, Severity: %s, Status: %s, Reason: %s\n", res.CheckID, res.Severity, res.Status, res.Reason)
 		for _, ev := range res.Evidence {
 			fmt.Printf("    Evidence: field=%s, sourceDoc=%s, sourceSpan=%s, confidence=%.2f\n", ev.Field, ev.SourceDoc, ev.SourceSpan, ev.Confidence)
@@ -116,13 +109,13 @@ func main() {
 	}
 
 	// Programmatic comparison
-	result := compareResults(opaResult, evalDecision, results)
+	result := compareResults(opaResult, string(decision.Status), decision.Results)
 
 	fmt.Printf("\n=== Comparison ===\n")
 	if result.decisionMatch {
 		fmt.Println("Decision: MATCH")
 	} else {
-		fmt.Printf("Decision: MISMATCH (OPA=%s, eval=%s)\n", opaResult.Decision, evalDecision)
+		fmt.Printf("Decision: MISMATCH (OPA=%s, eval=%s)\n", opaResult.Decision, decision.Status)
 	}
 
 	if len(result.findingMismatch) == 0 {

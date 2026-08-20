@@ -167,6 +167,27 @@ func loadSnapshot() (*evidence.EvidenceGraph, error) {
 	return &snapshot, nil
 }
 
+// Local HTTP DTOs — these are presentation models, not engine types.
+type enrichedSourceRef struct {
+	Filename  string `json:"filename"`
+	FieldName string `json:"field_name"`
+}
+
+type enrichedFinding struct {
+	Rule     string              `json:"rule"`
+	Severity string              `json:"severity"`
+	ClaimA   string              `json:"claim_a"`
+	ClaimB   string              `json:"claim_b"`
+	ValueA   interface{}         `json:"value_a"`
+	ValueB   interface{}         `json:"value_b"`
+	Sources  []enrichedSourceRef `json:"sources,omitempty"`
+}
+
+type enrichedResult struct {
+	Decision string            `json:"decision"`
+	Findings []enrichedFinding `json:"findings"`
+}
+
 func handleEvaluate(w http.ResponseWriter, r *http.Request) {
 	snapshot, err := loadSnapshot()
 	if err != nil {
@@ -176,28 +197,23 @@ func handleEvaluate(w http.ResponseWriter, r *http.Request) {
 
 	f := buildFactsFromSnapshot(snapshot)
 
-	// Run evaluation using loaded ruleset
-	results, err := evalRunner.RunRuleset(r.Context(), loadedRuleset, f)
+	decision, err := evalRunner.Evaluate(r.Context(), loadedRuleset, f)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("evaluation error: %v", err), 500)
 		return
 	}
 
-	// Compute final decision using aggregator
-	agg := &eval.DecisionAggregator{}
-	finalStatus, _ := agg.Aggregate(results)
-
-	// Populate EnrichedFinding.Sources directly from Result.Evidence
-	enriched := eval.EnrichedResult{Decision: finalStatus}
-	for _, res := range results {
-		var sources []eval.SourceRef
+	// Build HTTP-specific enriched response from engine Decision
+	enriched := enrichedResult{Decision: string(decision.Status)}
+	for _, res := range decision.Results {
+		var sources []enrichedSourceRef
 		for _, ev := range res.Evidence {
-			sources = append(sources, eval.SourceRef{
+			sources = append(sources, enrichedSourceRef{
 				Filename:  ev.SourceDoc,
 				FieldName: ev.Field,
 			})
 		}
-		ef := eval.EnrichedFinding{
+		ef := enrichedFinding{
 			Rule:     res.CheckID,
 			Severity: string(res.Severity),
 			ClaimA:   res.CheckID,
@@ -271,14 +287,14 @@ func handleDisposition(w http.ResponseWriter, r *http.Request) {
 
 	f := buildFactsFromSnapshot(snapshot)
 
-	results, err := evalRunner.RunRuleset(r.Context(), loadedRuleset, f)
+	decision, err := evalRunner.Evaluate(r.Context(), loadedRuleset, f)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("evaluation error: %v", err), 500)
 		return
 	}
 
 	var findings []review.Finding
-	for _, res := range results {
+	for _, res := range decision.Results {
 		findings = append(findings, review.Finding{
 			Rule:     res.CheckID,
 			Severity: string(res.Severity),
@@ -292,14 +308,11 @@ func handleDisposition(w http.ResponseWriter, r *http.Request) {
 		reviewsMap[r.FindingIndex] = r
 	}
 
-	agg := &eval.DecisionAggregator{}
-	evalDecision, _ := agg.Aggregate(results)
-
-	final := review.ComputeFinalDisposition(evalDecision, findings, reviewsMap)
+	final := review.ComputeFinalDisposition(string(decision.Status), findings, reviewsMap)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"eval_decision":     evalDecision,
+		"eval_decision":     string(decision.Status),
 		"final_disposition": final,
 		"reviews_count":     store.Count(),
 		"findings_count":    len(findings),
@@ -324,7 +337,7 @@ func handleFinalize(w http.ResponseWriter, r *http.Request) {
 
 	f := buildFactsFromSnapshot(snapshot)
 
-	results, err := evalRunner.RunRuleset(r.Context(), loadedRuleset, f)
+	decision, err := evalRunner.Evaluate(r.Context(), loadedRuleset, f)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("evaluation error: %v", err), 500)
 		return
@@ -341,7 +354,7 @@ func handleFinalize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var findings []review.Finding
-	for _, res := range results {
+	for _, res := range decision.Results {
 		findings = append(findings, review.Finding{
 			Rule:     res.CheckID,
 			Severity: string(res.Severity),
@@ -350,13 +363,10 @@ func handleFinalize(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	agg := &eval.DecisionAggregator{}
-	evalDecision, _ := agg.Aggregate(results)
-
 	artifact.AddDecision(audit.Decision{
 		CaseID:   "income_verification",
-		State:    evalDecision,
-		Findings: convertFindings(results),
+		State:    string(decision.Status),
+		Findings: convertFindings(decision.Results),
 	})
 
 	reviewsMap := make(map[int]*review.HumanReview)
@@ -370,7 +380,7 @@ func handleFinalize(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	final := review.ComputeFinalDisposition(evalDecision, findings, reviewsMap)
+	final := review.ComputeFinalDisposition(string(decision.Status), findings, reviewsMap)
 	artifact.SetFinalDisposition(final)
 	artifact.Finalize()
 
@@ -411,7 +421,7 @@ func handleAudit(w http.ResponseWriter, r *http.Request) {
 
 	f := buildFactsFromSnapshot(snapshot)
 
-	results, err := evalRunner.RunRuleset(r.Context(), loadedRuleset, f)
+	decision, err := evalRunner.Evaluate(r.Context(), loadedRuleset, f)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("evaluation error: %v", err), 500)
 		return
@@ -428,7 +438,7 @@ func handleAudit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var findings []review.Finding
-	for _, res := range results {
+	for _, res := range decision.Results {
 		findings = append(findings, review.Finding{
 			Rule:     res.CheckID,
 			Severity: string(res.Severity),
@@ -437,13 +447,10 @@ func handleAudit(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	agg := &eval.DecisionAggregator{}
-	evalDecision, _ := agg.Aggregate(results)
-
 	artifact.AddDecision(audit.Decision{
 		CaseID:   "income_verification",
-		State:    evalDecision,
-		Findings: convertFindings(results),
+		State:    string(decision.Status),
+		Findings: convertFindings(decision.Results),
 	})
 
 	reviewsMap := make(map[int]*review.HumanReview)
@@ -457,7 +464,7 @@ func handleAudit(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	final := review.ComputeFinalDisposition(evalDecision, findings, reviewsMap)
+	final := review.ComputeFinalDisposition(string(decision.Status), findings, reviewsMap)
 	artifact.SetFinalDisposition(final)
 	artifact.Finalize()
 
