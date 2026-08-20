@@ -1,0 +1,150 @@
+scenarios:
+  - name: "all_docs_present"
+    origin: "real_fixture"
+    input:
+      facts:
+        - semantic_type: "gross_income_projected"
+          source_doc: "paystub"
+          field: "annualized_gross_ytd"
+          value: 125000
+          source_span: "page=1;bbox=[508,274,50,8]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "w2"
+          field: "wages_tips_other_compensation"
+          value: 120000
+          source_span: "page=1;bbox=[224,120,44,8]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "1040"
+          field: "line1z_wages"
+          value: 120000
+          source_span: "page=1;bbox=[409,260,50,8]"
+          confidence: 0.95
+        - semantic_type: "net_cash_flow"
+          source_doc: "bank_statement"
+          field: "total_deposits"
+          value: 21250
+          source_span: "page=1;bbox=[207,189,45,8]"
+          confidence: 0.95
+    params: {}
+    expected:
+      check_id: "required_documents"
+      status: "PASS"
+      severity: "INFO"
+      reason: "All required documents present"
+      evidence: []
+
+  - name: "missing_w2"
+    origin: "real_fixture"
+    input:
+      facts:
+        - semantic_type: "gross_income_projected"
+          source_doc: "paystub"
+          field: "annualized_gross_ytd"
+          value: 138000
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "form_1040"
+          field: "line1z_wages"
+          value: 120000
+          source_span: "page=1;bbox=[1126,714,156,36]"
+          confidence: 0.95
+        - semantic_type: "net_cash_flow"
+          source_doc: "bank_statement"
+          field: "total_deposits"
+          value: 21250
+          source_span: "page=1;bbox=[207,189,45,8]"
+          confidence: 0.95
+    params: {}
+    expected:
+      check_id: "required_documents"
+      status: "FAIL"
+      severity: "BLOCKING"
+      reason: "Missing required documents: w2"
+      evidence: []
+
+  - name: "missing_form_1040"
+    origin: "human_adversarial"
+    input:
+      facts:
+        - semantic_type: "gross_income_projected"
+          source_doc: "paystub"
+          field: "annualized_gross_ytd"
+          value: 138000
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "w2"
+          field: "wages_tips_other_compensation"
+          value: 120000
+          source_span: "page=1;bbox=[608,301,335,51]"
+          confidence: 0.95
+        - semantic_type: "net_cash_flow"
+          source_doc: "bank_statement"
+          field: "total_deposits"
+          value: 21250
+          source_span: "page=1;bbox=[207,189,45,8]"
+          confidence: 0.95
+    params: {}
+    expected:
+      check_id: "required_documents"
+      status: "FAIL"
+      severity: "BLOCKING"
+      reason: "Missing required documents: form_1040"
+      evidence: []
+
+  - name: "missing_multiple"
+    origin: "human_adversarial"
+    input:
+      facts:
+        - semantic_type: "gross_income_projected"
+          source_doc: "paystub"
+          field: "annualized_gross_ytd"
+          value: 138000
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
+        - semantic_type: "net_cash_flow"
+          source_doc: "bank_statement"
+          field: "total_deposits"
+          value: 21250
+          source_span: "page=1;bbox=[207,189,45,8]"
+          confidence: 0.95
+    params: {}
+    expected:
+      check_id: "required_documents"
+      status: "FAIL"
+      severity: "BLOCKING"
+      reason: "Missing required documents: w2, form_1040"
+      evidence: []
+
+  - name: "evidence_ordering"
+    origin: "human_adversarial"
+    input:
+      facts:
+        - semantic_type: "gross_income_taxable"
+          source_doc: "form_1040"
+          field: "line1z_wages"
+          value: 120000
+          source_span: "page=1;bbox=[1126,714,156,36]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "w2"
+          field: "wages_tips_other_compensation"
+          value: 120000
+          source_span: "page=1;bbox=[608,301,335,51]"
+          confidence: 0.95
+        - semantic_type: "gross_income_projected"
+          source_doc: "paystub"
+          field: "annualized_gross_ytd"
+          value: 138000
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
+    params: {}
+    expected:
+      check_id: "required_documents"
+      status: "PASS"
+      severity: "INFO"
+      reason: "All required documents present"
+      evidence: []

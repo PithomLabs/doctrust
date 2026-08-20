@@ -1,0 +1,47 @@
+{
+  "facts": {
+    "gross_income_projected": [
+      {
+        "value": 138000,
+        "source_doc": "paystub.pdf",
+        "field_name": "annualized_gross_ytd",
+        "source_span": "page=1;bbox=[463,947,707,27]",
+        "confidence": 0.95
+      }
+    ],
+    "gross_income_taxable": [
+      {
+        "value": 120000,
+        "source_doc": "w2.pdf",
+        "field_name": "wages_tips_other_compensation",
+        "source_span": "page=1;bbox=[608,301,335,51]",
+        "confidence": 0.95
+      },
+      {
+        "value": 120000,
+        "source_doc": "form_1040.pdf",
+        "field_name": "line1z_wages",
+        "source_span": "page=1;bbox=[1126,714,156,36]",
+        "confidence": 0.95
+      }
+    ],
+    "bonus_compensation": [
+      {
+        "value": 18000,
+        "source_doc": "paystub.pdf",
+        "field_name": "bonus_ytd",
+        "source_span": "page=1;bbox=[1418,803,139,30]",
+        "confidence": 0.95
+      }
+    ],
+    "net_cash_flow": [
+      {
+        "value": 21250,
+        "source_doc": "bank_statement.pdf",
+        "field_name": "total_deposits",
+        "source_span": "page=1;bbox=[207,189,45,8]",
+        "confidence": 0.95
+      }
+    ]
+  }
+}

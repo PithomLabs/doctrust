@@ -1,0 +1,226 @@
+scenarios:
+  - name: "pass_within_threshold"
+    origin: "real_fixture"
+    input:
+      facts:
+        - semantic_type: "gross_income_projected"
+          source_doc: "paystub"
+          field: "annualized_gross_ytd"
+          value: 125000
+          source_span: "page=1;bbox=[508,274,50,8]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "w2"
+          field: "wages_tips_other_compensation"
+          value: 120000
+          source_span: "page=1;bbox=[224,120,44,8]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "form_1040"
+          field: "line1z_wages"
+          value: 120000
+          source_span: "page=1;bbox=[409,260,50,8]"
+          confidence: 0.95
+        - semantic_type: "net_cash_flow"
+          source_doc: "bank_statement"
+          field: "total_deposits"
+          value: 21250
+          source_span: "page=1;bbox=[207,189,45,8]"
+          confidence: 0.95
+    params:
+      tolerance: 0.05
+    expected:
+      check_id: "gross_income_consistency"
+      status: "PASS"
+      severity: "INFO"
+      reason: "Paystub gross within tolerance of W-2/1040"
+      evidence:
+        - field: "gross_income_projected"
+          source_doc: "paystub"
+        - field: "gross_income_taxable"
+          source_doc: "w2"
+
+  - name: "conflict_with_bonus"
+    origin: "real_fixture"
+    input:
+      facts:
+        - semantic_type: "gross_income_projected"
+          source_doc: "paystub"
+          field: "annualized_gross_ytd"
+          value: 138000
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "w2"
+          field: "wages_tips_other_compensation"
+          value: 120000
+          source_span: "page=1;bbox=[608,301,335,51]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "1040"
+          field: "line1z_wages"
+          value: 120000
+          source_span: "page=1;bbox=[1126,714,156,36]"
+          confidence: 0.95
+        - semantic_type: "bonus_compensation"
+          source_doc: "paystub"
+          field: "bonus_compensation"
+          value: 18000
+          source_span: "page=1;bbox=[1418,803,139,30]"
+          confidence: 0.95
+    params:
+      tolerance: 0.05
+    expected:
+      check_id: "gross_income_consistency"
+      status: "REVIEW"
+      severity: "WARNING"
+      reason: "Variance exceeds tolerance; documented bonus may explain"
+      evidence:
+        - field: "gross_income_projected"
+          source_doc: "paystub"
+        - field: "gross_income_taxable"
+          source_doc: "w2"
+        - field: "bonus_compensation"
+          source_doc: "paystub"
+
+  - name: "threshold_boundary_pass"
+    origin: "real_fixture"
+    input:
+      facts:
+        - semantic_type: "gross_income_projected"
+          source_doc: "paystub"
+          field: "annualized_gross_ytd"
+          value: 126000
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "w2"
+          field: "wages_tips_other_compensation"
+          value: 120000
+          source_span: "page=1;bbox=[608,301,335,51]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "1040"
+          field: "line1z_wages"
+          value: 120000
+          source_span: "page=1;bbox=[1126,714,156,36]"
+          confidence: 0.95
+    params:
+      tolerance: 0.05
+    expected:
+      check_id: "gross_income_consistency"
+      status: "PASS"
+      severity: "INFO"
+      reason: "Paystub gross within tolerance of W-2/1040"
+      evidence:
+        - field: "gross_income_projected"
+          source_doc: "paystub"
+        - field: "gross_income_taxable"
+          source_doc: "w2"
+
+  - name: "threshold_boundary_review"
+    origin: "real_fixture"
+    input:
+      facts:
+        - semantic_type: "gross_income_projected"
+          source_doc: "paystub"
+          field: "annualized_gross_ytd"
+          value: 126001
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "w2"
+          field: "wages_tips_other_compensation"
+          value: 120000
+          source_span: "page=1;bbox=[608,301,335,51]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "1040"
+          field: "line1z_wages"
+          value: 120000
+          source_span: "page=1;bbox=[1126,714,156,36]"
+          confidence: 0.95
+    params:
+      tolerance: 0.05
+    expected:
+      check_id: "gross_income_consistency"
+      status: "REVIEW"
+      severity: "WARNING"
+      reason: "Paystub projected gross exceeds corroborated taxable income by 5.0% (tolerance: 5.0%)"
+      evidence:
+        - field: "gross_income_projected"
+          source_doc: "paystub"
+        - field: "gross_income_taxable"
+          source_doc: "w2"
+
+  - name: "high_variance_no_bonus"
+    origin: "human_adversarial"
+    input:
+      facts:
+        - semantic_type: "gross_income_projected"
+          source_doc: "paystub"
+          field: "annualized_gross_ytd"
+          value: 150000
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "w2"
+          field: "wages_tips_other_compensation"
+          value: 120000
+          source_span: "page=1;bbox=[608,301,335,51]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "1040"
+          field: "line1z_wages"
+          value: 120000
+          source_span: "page=1;bbox=[1126,714,156,36]"
+          confidence: 0.95
+    params:
+      tolerance: 0.05
+    expected:
+      check_id: "gross_income_consistency"
+      status: "REVIEW"
+      severity: "WARNING"
+      reason: "Paystub projected gross exceeds corroborated taxable income by 25.0% (tolerance: 5.0%)"
+      evidence:
+        - field: "gross_income_projected"
+          source_doc: "paystub"
+        - field: "gross_income_taxable"
+          source_doc: "w2"
+
+  - name: "missing_w2"
+    origin: "real_fixture"
+    input:
+      facts:
+        - semantic_type: "gross_income_projected"
+          source_doc: "paystub"
+          field: "annualized_gross_ytd"
+          value: 138000
+          source_span: "page=1;bbox=[463,947,707,27]"
+          confidence: 0.95
+        - semantic_type: "gross_income_taxable"
+          source_doc: "1040"
+          field: "line1z_wages"
+          value: 120000
+          source_span: "page=1;bbox=[1126,714,156,36]"
+          confidence: 0.95
+        - semantic_type: "bonus_compensation"
+          source_doc: "paystub"
+          field: "bonus_compensation"
+          value: 18000
+          source_span: "page=1;bbox=[1418,803,139,30]"
+          confidence: 0.95
+    params:
+      tolerance: 0.05
+    expected:
+      check_id: "gross_income_consistency"
+      status: "REVIEW"
+      severity: "WARNING"
+      reason: "Variance exceeds tolerance; documented bonus may explain"
+      evidence:
+        - field: "gross_income_projected"
+          source_doc: "paystub"
+        - field: "gross_income_taxable"
+          source_doc: "1040"
+        - field: "bonus_compensation"
+          source_doc: "paystub"

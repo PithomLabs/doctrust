@@ -156,6 +156,12 @@ func main() {
 		documents = append(documents, doc)
 		totalFields += len(result.Output.Data)
 
+		// Parse PDF MediaBox for bbox coordinate transform
+		pdfW, pdfH := 612.0, 792.0 // Letter defaults
+		if mw, mh, err := evidence.ParseMediaBox(fileBytes); err == nil && mw > 0 && mh > 0 {
+			pdfW, pdfH = mw, mh
+		}
+
 		extResult := &nutrient.ExtractionResult{
 			FileName:     entry.Name(),
 			DocumentType: docType,
@@ -164,7 +170,7 @@ func main() {
 			Pages:        result.Output.Pages,
 		}
 
-		claims := normalizer.Normalize(doc, extResult)
+		claims := normalizer.Normalize(doc, extResult, pdfW, pdfH)
 		allClaims = append(allClaims, claims...)
 	}
 

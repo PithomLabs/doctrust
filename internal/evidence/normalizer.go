@@ -5,91 +5,24 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/doctrust/doctrust/internal/extraction"
 	"github.com/doctrust/doctrust/internal/nutrient"
 )
 
-// ExtractionConfig defines how to normalize a specific document type.
-type ExtractionConfig struct {
-	DocumentType DocumentType
-	// FieldMapping maps Nutrient field names to semantic claim IDs.
-	FieldMapping map[string]FieldNormalization
-}
-
-// FieldNormalization defines how a single extracted field becomes a claim.
-type FieldNormalization struct {
-	SemanticType string // e.g. "gross_income_taxable"
-	ValueType    string // "currency", "string", "number"
-	// CompareWith is the claim ID this field should be compared against for corroboration.
-	CompareWith string
-	// Threshold is the max allowed percentage variance before triggering review.
-	Threshold float64
-}
-
 // Normalizer converts Nutrient extraction output into claims and relationships.
 type Normalizer struct {
-	configs map[nutrient.DocumentType]ExtractionConfig
+	configs map[nutrient.DocumentType]extraction.ExtractionConfig
 }
 
 // NewNormalizer creates a normalizer with income verification configs.
 func NewNormalizer() *Normalizer {
 	return &Normalizer{
-		configs: incomeVerificationConfigs(),
-	}
-}
-
-func incomeVerificationConfigs() map[nutrient.DocumentType]ExtractionConfig {
-	return map[nutrient.DocumentType]ExtractionConfig{
-		nutrient.DocTypePaystub: {
-			DocumentType: DocTypePaystub,
-			FieldMapping: map[string]FieldNormalization{
-				"annualized_gross_ytd": {
-					SemanticType: "gross_income_projected",
-					ValueType:    "currency",
-					CompareWith:  "w2.wages_tips_other_compensation",
-					Threshold:    5.0,
-				},
-				"base_salary_ytd": {
-					SemanticType: "base_salary",
-					ValueType:    "currency",
-				},
-				"bonus_ytd": {
-					SemanticType: "bonus_compensation",
-					ValueType:    "currency",
-				},
-			},
-		},
-		nutrient.DocTypeW2: {
-			DocumentType: DocTypeW2,
-			FieldMapping: map[string]FieldNormalization{
-				"wages_tips_other_compensation": {
-					SemanticType: "gross_income_taxable",
-					ValueType:    "currency",
-				},
-			},
-		},
-		nutrient.DocType1040: {
-			DocumentType: DocType1040,
-			FieldMapping: map[string]FieldNormalization{
-				"line1z_wages": {
-					SemanticType: "gross_income_taxable",
-					ValueType:    "currency",
-				},
-			},
-		},
-		nutrient.DocTypeBankStmt: {
-			DocumentType: DocTypeBankStmt,
-			FieldMapping: map[string]FieldNormalization{
-				"total_deposits": {
-					SemanticType: "net_cash_flow",
-					ValueType:    "currency",
-				},
-			},
-		},
+		configs: extraction.IncomeVerificationConfigs(),
 	}
 }
 
 // Normalize takes a Nutrient extraction result and produces claims.
-func (n *Normalizer) Normalize(doc Document, result *nutrient.ExtractionResult) []Claim {
+func (n *Normalizer) Normalize(doc Document, result *nutrient.ExtractionResult, pdfW, pdfH float64) []Claim {
 	config, ok := n.configs[result.DocumentType]
 	if !ok {
 		return nil
@@ -106,9 +39,9 @@ func (n *Normalizer) Normalize(doc Document, result *nutrient.ExtractionResult) 
 			ID:           fmt.Sprintf("%s.%s", result.DocumentType, field),
 			Field:        field,
 			SemanticType: norm.SemanticType,
-			Value:        parseCurrencyValue(value),
+			Value:        extraction.ParseCurrencyValue(value),
 			ValueType:    norm.ValueType,
-			Sources:      extractSources(doc, result, field),
+			Sources:      extractSources(doc, result, field, pdfW, pdfH),
 			Status:       ClaimSingular,
 		}
 		claims = append(claims, claim)
@@ -211,53 +144,60 @@ func (n *Normalizer) BuildRelationships(claims []Claim) []Relationship {
 	return rels
 }
 
-func extractSources(doc Document, result *nutrient.ExtractionResult, field string) []Source {
+func extractSources(doc Document, result *nutrient.ExtractionResult, field string, pdfW, pdfH float64) []Source {
 	citation, ok := result.Metadata[field]
 	if !ok {
 		return nil
 	}
 
-	var sources []Source
-	for _, sb := range citation.SourceBboxes {
-		s := Source{
-			DocumentID: doc.ID,
-			Filename:   doc.Filename,
-			Page:       sb.PageNumber,
-			Confidence: citation.Confidence,
-			FieldName:  field,
-		}
-		if sb.Bbox != nil {
-			s.BBox = []float64{sb.Bbox.X, sb.Bbox.Y, sb.Bbox.Width, sb.Bbox.Height}
-		}
-		sources = append(sources, s)
+	nutW, nutH := 1700.0, 2200.0
+	if len(result.Pages) > 0 {
+		nutW = result.Pages[0].Width
+		nutH = result.Pages[0].Height
 	}
 
-	if len(sources) == 0 && citation.Bbox != nil {
+	scaleX := pdfW / nutW
+	scaleY := pdfH / nutH
+
+	var sources []Source
+
+	if citation.Bbox != nil {
 		sources = append(sources, Source{
 			DocumentID: doc.ID,
 			Filename:   doc.Filename,
 			Page:       citation.PageNumber,
-			BBox:       []float64{citation.Bbox.X, citation.Bbox.Y, citation.Bbox.Width, citation.Bbox.Height},
+			BBox:       toPDFPoints(citation.Bbox, scaleX, scaleY, pdfH),
 			Confidence: citation.Confidence,
 			FieldName:  field,
 		})
+	} else {
+		for _, sb := range citation.SourceBboxes {
+			if sb.Bbox != nil {
+				sources = append(sources, Source{
+					DocumentID: doc.ID,
+					Filename:   doc.Filename,
+					Page:       sb.PageNumber,
+					BBox:       toPDFPoints(sb.Bbox, scaleX, scaleY, pdfH),
+					Confidence: citation.Confidence,
+					FieldName:  field,
+				})
+			}
+		}
 	}
 
 	return sources
 }
 
-func parseCurrencyValue(v any) any {
-	s, ok := v.(string)
-	if !ok {
-		return v
+func toPDFPoints(bbox *nutrient.BBox, scaleX, scaleY, pdfH float64) []float64 {
+	if bbox == nil {
+		return nil
 	}
-	s = strings.ReplaceAll(s, "$", "")
-	s = strings.ReplaceAll(s, ",", "")
-	s = strings.TrimSpace(s)
-	if f, err := strconv.ParseFloat(s, 64); err == nil {
-		return f
-	}
-	return v
+	// Nutrient bbox: top-left origin. PDF annotation rect: bottom-left origin.
+	x := bbox.X * scaleX
+	yBottom := pdfH - (bbox.Y+bbox.Height)*scaleY
+	w := bbox.Width * scaleX
+	h := bbox.Height * scaleY
+	return []float64{x, yBottom, w, h}
 }
 
 func toFloat64(v any) float64 {

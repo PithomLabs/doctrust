@@ -88,6 +88,15 @@ type EvidenceGraph struct {
 	CreatedAt     time.Time      `json:"created_at"`
 }
 
+// EvidenceRef is the pointer from a check result back to source evidence.
+// Owned by internal/evidence.
+type EvidenceRef struct {
+	Field      string  `json:"field" yaml:"field"`
+	SourceDoc  string  `json:"source_doc" yaml:"source_doc"`
+	SourceSpan string  `json:"source_span" yaml:"source_span"`
+	Confidence float64 `json:"confidence" yaml:"confidence"`
+}
+
 // ComputeHash computes a SHA-256 hash of the document content.
 func ComputeHash(data []byte) string {
 	h := sha256.Sum256(data)

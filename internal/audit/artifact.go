@@ -9,15 +9,17 @@ import (
 )
 
 type Artifact struct {
-	Version     string                 `json:"version"`
-	PolicyID    string                 `json:"policy_id"`
-	PolicyHash  string                 `json:"policy_hash"`
-	Decisions   []Decision             `json:"decisions"`
-	Documents   []DocumentRecord       `json:"documents"`
-	CreatedAt   time.Time              `json:"created_at"`
-	CompletedAt *time.Time             `json:"completed_at,omitempty"`
-	Signatures  []Signature            `json:"signatures,omitempty"`
-	Manifest    Manifest               `json:"manifest"`
+	Version          string                 `json:"version"`
+	PolicyID         string                 `json:"policy_id"`
+	PolicyHash       string                 `json:"policy_hash"`
+	Decisions        []Decision             `json:"decisions"`
+	Documents        []DocumentRecord       `json:"documents"`
+	HumanReviews     []HumanReviewRecord    `json:"human_reviews,omitempty"`
+	FinalDisposition string                 `json:"final_disposition,omitempty"`
+	CreatedAt        time.Time              `json:"created_at"`
+	CompletedAt      *time.Time             `json:"completed_at,omitempty"`
+	Signatures       []Signature            `json:"signatures,omitempty"`
+	Manifest         Manifest               `json:"manifest"`
 }
 
 type Decision struct {
@@ -74,6 +76,13 @@ type Manifest struct {
 	ArtifactHash  string `json:"artifact_hash"`
 }
 
+type HumanReviewRecord struct {
+	FindingIndex int       `json:"finding_index"`
+	Action       string    `json:"action"`
+	Note         string    `json:"note"`
+	ResolvedAt   time.Time `json:"resolved_at"`
+}
+
 func NewArtifact(policyID, policyHash string) *Artifact {
 	return &Artifact{
 		Version:   "1.0",
@@ -89,6 +98,14 @@ func (a *Artifact) AddDecision(d Decision) {
 
 func (a *Artifact) AddDocument(d DocumentRecord) {
 	a.Documents = append(a.Documents, d)
+}
+
+func (a *Artifact) AddHumanReview(r HumanReviewRecord) {
+	a.HumanReviews = append(a.HumanReviews, r)
+}
+
+func (a *Artifact) SetFinalDisposition(disposition string) {
+	a.FinalDisposition = disposition
 }
 
 func (a *Artifact) Finalize() {

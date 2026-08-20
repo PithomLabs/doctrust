@@ -16,7 +16,7 @@ const (
 	defaultBaseURL = "https://api.nutrient.io"
 	extractEndpoint = "extraction/extract"
 	parseEndpoint   = "extraction/parse"
-	signEndpoint    = "build/sign"
+	signEndpoint    = "sign"
 	apiVersion      = "2026-05-25"
 )
 
@@ -216,24 +216,10 @@ func (c *Client) SignPDF(filePath string, signatureConfig map[string]any) ([]byt
 		return nil, fmt.Errorf("copy file: %w", err)
 	}
 
-	instructions := map[string]any{
-		"parts": []map[string]any{
-			{"file": "file"},
-		},
-		"output": map[string]any{
-			"type": "pdf",
-		},
-		"actions": []map[string]any{
-			{
-				"type":      "digitallySign",
-				"signature": signatureConfig,
-			},
-		},
-	}
-
-	instructionsJSON, _ := json.Marshal(instructions)
-	if err := writer.WriteField("instructions", string(instructionsJSON)); err != nil {
-		return nil, fmt.Errorf("write instructions: %w", err)
+	// DWS sign endpoint expects signature options in "data" field
+	dataJSON, _ := json.Marshal(signatureConfig)
+	if err := writer.WriteField("data", string(dataJSON)); err != nil {
+		return nil, fmt.Errorf("write data: %w", err)
 	}
 
 	if err := writer.Close(); err != nil {

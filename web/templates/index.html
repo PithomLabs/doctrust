@@ -22,7 +22,35 @@
             border-radius: 12px; font-size: 12px; font-weight: 600;
         }
 
-        .layout { display: grid; grid-template-columns: 1fr 420px; height: calc(100vh - 73px); }
+        /* Persistent state bar */
+        .state-bar {
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 12px 32px;
+            display: flex; align-items: center; gap: 24px;
+        }
+        .state-bar .disposition {
+            display: flex; align-items: center; gap: 12px;
+            flex: 1;
+        }
+        .state-bar .badge {
+            font-size: 14px; padding: 6px 16px; font-weight: 600;
+        }
+        .state-bar .badge.review { background: #d29922; color: #0d1117; }
+        .state-bar .badge.pass { background: #238636; color: white; }
+        .state-bar .badge.fail { background: #da3633; color: white; }
+        .state-bar .actions {
+            display: flex; align-items: center; gap: 12px;
+        }
+        .state-bar .btn-finalize {
+            background: #238636; color: white; border: none; padding: 10px 20px;
+            border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;
+        }
+        .state-bar .btn-finalize:hover:not(:disabled) { background: #2ea043; }
+        .state-bar .btn-finalize:disabled { background: #30363d; color: #6e7681; cursor: not-allowed; }
+        .state-bar .signing-status { font-size: 12px; color: #8b949e; }
+
+        .layout { display: grid; grid-template-columns: 1fr 420px; height: calc(100vh - 128px); }
 
         .viewer-panel {
             background: #161b22;
@@ -96,6 +124,29 @@
         }
         .finding-values span { color: #58a6ff; }
 
+        /* Inline review actions */
+        .finding-actions {
+            margin-top: 12px; padding-top: 12px; border-top: 1px solid #30363d;
+            display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+        }
+        .finding-actions .btn-sm {
+            padding: 6px 12px; font-size: 12px; font-weight: 500; border-radius: 4px;
+            border: none; cursor: pointer;
+        }
+        .btn-confirm { background: #238636; color: white; }
+        .btn-confirm:hover { background: #2ea043; }
+        .btn-reject { background: #da3633; color: white; }
+        .btn-reject:hover { background: #f85149; }
+        .btn-override { background: #d29922; color: #0d1117; }
+        .btn-override:hover { background: #e3b341; }
+        .finding-note {
+            flex: 1; min-width: 200px;
+            background: #0d1117; border: 1px solid #30363d; color: #e1e4e8;
+            padding: 6px 10px; border-radius: 4px; font-size: 12px;
+        }
+        .finding-note:focus { outline: none; border-color: #58a6ff; }
+        .finding-resolved { font-size: 11px; color: #8b949e; margin-left: 8px; }
+
         .doc-card {
             background: #21262d; border: 1px solid #30363d; border-radius: 8px;
             padding: 12px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s;
@@ -132,6 +183,10 @@
             display: flex; align-items: center; justify-content: center;
             height: 100%; color: #8b949e;
         }
+
+        .annotation-highlight {
+            stroke: #ffd700; stroke-width: 2; fill: #ffd700; fill-opacity: 0.2;
+        }
     </style>
 </head>
 <body>
@@ -139,6 +194,18 @@
         <h1>DocTrust</h1>
         <span class="subtitle">Universal Document Trust Engine</span>
         <span class="badge">OPA + Nutrient DWS</span>
+    </div>
+
+    <!-- Persistent State Bar -->
+    <div class="state-bar" id="stateBar">
+        <div class="disposition">
+            <span id="finalBadge" class="badge review">FINAL: REVIEW</span>
+            <span style="color: #8b949e; font-size: 13px;" id="opaBadge">OPA: —</span>
+        </div>
+        <div class="actions">
+            <button class="btn btn-finalize" id="btnFinalize" onclick="finalizeAndSign()" disabled>Finalize & Sign</button>
+            <span class="signing-status" id="signingStatus"></span>
+        </div>
     </div>
 
     <div class="layout">
@@ -173,6 +240,8 @@
         let currentResult = null;
         let currentAudit = null;
         let currentTab = 'findings';
+        let currentAnnotation = null;
+        let selectedFindingIndex = -1;
 
         async function init() {
             try {
@@ -282,14 +351,24 @@
             if (currentResult.findings && currentResult.findings.length > 0) {
                 currentResult.findings.forEach((f, i) => {
                     const sevClass = f.severity === 'high' ? 'high' : f.severity === 'medium' ? 'medium' : 'low';
+                    const hasReview = hasReviewForFinding(i);
+                    const review = getReviewForFinding(i);
+                    
                     html += `
-                        <div class="finding-card" onclick="navigateToFinding(${i})">
+                        <div class="finding-card ${i === selectedFindingIndex ? 'active' : ''}" onclick="navigateToFinding(${i})">
                             <div class="finding-rule">${f.rule}</div>
                             <span class="finding-severity severity-${sevClass}">${f.severity}</span>
                             <div class="finding-values">
                                 <span>${f.claim_a}</span> = ${f.value_a}<br>
                                 <span>${f.claim_b}</span> = ${f.value_b}<br>
                                 Variance: ${f.variance ? f.variance.toFixed(1) : '0.0'}%
+                            </div>
+                            <div class="finding-actions">
+                                <button class="btn-sm btn-confirm" onclick="event.stopPropagation(); submitReview(${i}, 'confirm')">Confirm</button>
+                                <button class="btn-sm btn-reject" onclick="event.stopPropagation(); submitReview(${i}, 'reject')">Reject</button>
+                                <button class="btn-sm btn-override" onclick="event.stopPropagation(); submitReview(${i}, 'override')">Override</button>
+                                <input type="text" class="finding-note" id="note-${i}" placeholder="Note (required for confirm)" value="${review ? review.note : ''}" ${hasReview ? 'disabled' : ''}>
+                                ${hasReview ? `<span class="finding-resolved">✓ ${review.action} at ${new Date(review.resolved_at).toLocaleTimeString()}</span>` : ''}
                             </div>
                         </div>
                     `;
@@ -299,6 +378,47 @@
             }
 
             container.innerHTML = html;
+            updateStateBar();
+        }
+
+        function hasReviewForFinding(index) {
+            if (!currentAudit || !currentAudit.human_reviews) return false;
+            return currentAudit.human_reviews.some(r => r.finding_index === index);
+        }
+
+        function getReviewForFinding(index) {
+            if (!currentAudit || !currentAudit.human_reviews) return null;
+            return currentAudit.human_reviews.find(r => r.finding_index === index) || null;
+        }
+
+        async function submitReview(findingIndex, action) {
+            const note = document.getElementById(`note-${findingIndex}`).value.trim();
+            if (action === 'confirm' && !note) {
+                alert('Note is required for Confirm');
+                return;
+            }
+
+            try {
+                const resp = await fetch('/api/review', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ finding_index: findingIndex, action, note })
+                });
+                if (!resp.ok) throw new Error('Review failed');
+                
+                // Refresh audit to get updated reviews
+                const auditResp = await fetch('/api/audit');
+                currentAudit = await auditResp.json();
+                
+                // Re-evaluate disposition
+                const dispResp = await fetch('/api/disposition');
+                const disp = await dispResp.json();
+                
+                renderFindings(); // Re-render with updated review state
+            } catch (e) {
+                console.error('Review error:', e);
+                alert('Failed to submit review: ' + e.message);
+            }
         }
 
         function renderDocuments() {
@@ -355,9 +475,112 @@
         }
 
         function navigateToFinding(index) {
+            selectedFindingIndex = index;
             document.querySelectorAll('.finding-card').forEach((c, i) => {
                 c.classList.toggle('active', i === index);
             });
+
+            if (!currentResult || !currentResult.findings || !currentResult.findings[index]) return;
+            const finding = currentResult.findings[index];
+            if (!finding.sources || finding.sources.length === 0) return;
+
+            const source = finding.sources[0]; // Use first source
+            const page = source.page;
+            const bbox = source.bbox; // [x, y, w, h] in PDF points, bottom-left origin
+
+            if (!viewer || !bbox) return;
+
+            // Clear previous annotation
+            if (currentAnnotation) {
+                viewer.annotationManager.remove(currentAnnotation);
+                currentAnnotation = null;
+            }
+
+            // Navigate to page (1-indexed)
+            viewer.setPageNumber(page);
+
+            // Add highlight annotation
+            // bbox is [x, y, w, h] in PDF points (bottom-left origin)
+            // Nutrient RectangleAnnotation expects rect in PDF coordinates
+            try {
+                const rect = { x: bbox[0], y: bbox[1], width: bbox[2], height: bbox[3] };
+                currentAnnotation = new PSPDFKit.Annotations.RectangleAnnotation({
+                    pageIndex: page - 1,
+                    rect: rect,
+                    fillColor: PSPDFKit.Color.ofRGBA(1, 0.84, 0, 0.3),
+                    strokeColor: PSPDFKit.Color.ofRGBA(1, 0.84, 0, 1),
+                    strokeWidth: 2,
+                });
+                viewer.annotationManager.add(currentAnnotation);
+            } catch (e) {
+                console.error('Annotation error:', e);
+            }
+        }
+
+        function updateStateBar() {
+            if (!currentResult) return;
+
+            const finalBadge = document.getElementById('finalBadge');
+            const opaBadge = document.getElementById('opaBadge');
+            const btnFinalize = document.getElementById('btnFinalize');
+
+            const opaDecision = currentResult.decision || 'UNKNOWN';
+            opaBadge.textContent = `OPA: ${opaDecision}`;
+
+            // Check if all findings have reviews
+            const allReviewed = currentResult.findings && currentResult.findings.every((f, i) => hasReviewForFinding(i));
+            
+            if (allReviewed && currentResult.findings && currentResult.findings.length > 0) {
+                // Fetch disposition
+                fetch('/api/disposition')
+                    .then(r => r.json())
+                    .then(d => {
+                        const disp = d.final_disposition || 'REVIEW';
+                        finalBadge.textContent = `FINAL: ${disp}`;
+                        finalBadge.className = 'badge ' + disp.toLowerCase();
+                        btnFinalize.disabled = false;
+                    });
+            } else {
+                finalBadge.textContent = 'FINAL: REVIEW';
+                finalBadge.className = 'badge review';
+                btnFinalize.disabled = true;
+            }
+        }
+
+        async function finalizeAndSign() {
+            const btn = document.getElementById('btnFinalize');
+            const status = document.getElementById('signingStatus');
+            btn.disabled = true;
+            status.textContent = 'Finalizing...';
+
+            try {
+                // Finalize
+                const finalizeResp = await fetch('/api/finalize', { method: 'POST' });
+                const finalizeData = await finalizeResp.json();
+                if (!finalizeResp.ok) throw new Error(finalizeData.error || 'Finalize failed');
+
+                status.textContent = 'Signing with Nutrient DWS...';
+                
+                // Sign
+                const signResp = await fetch('/api/sign', { method: 'POST' });
+                const signData = await signResp.json();
+                if (!signResp.ok) throw new Error(signData.error || 'Signing failed');
+
+                status.textContent = `✓ Signed (${signData.signed_hash.substring(0,16)}...)`;
+                
+                // Offer download
+                const a = document.createElement('a');
+                a.href = `/api/documents/${signData.signed_path.split('/').pop()}`;
+                a.download = 'audit_report_signed.pdf';
+                a.click();
+                
+                // Update audit view
+                await showAudit();
+            } catch (e) {
+                console.error('Finalize/Sign error:', e);
+                status.textContent = `Error: ${e.message}`;
+                btn.disabled = false;
+            }
         }
 
         init();

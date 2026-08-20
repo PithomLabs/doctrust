@@ -4,25 +4,25 @@
     {
       "id": "doc_1",
       "filename": "1_Paystub_2025.pdf",
-      "hash": "f1dc0f92a20cbadfc95e65176177ded0d22c33e627df050626d798fc64783cb0",
+      "hash": "0d2bfc866608184d82a3a422f094d809bb44d1c912680962c39f02b1ab75a7c8",
       "type": "paystub"
     },
     {
       "id": "doc_2",
       "filename": "2_W2_Form_2025.pdf",
-      "hash": "4c398895b4d272d3f8e6bdee90551a093e4365882d90d8cfcb0fba6529a3fb31",
+      "hash": "adf9496731688f506ad18bbdff1e7bae7a14fcba6c97f7704e7c32b3164f0377",
       "type": "w2"
     },
     {
       "id": "doc_3",
       "filename": "3_Form1040_TaxReturn_2025.pdf",
-      "hash": "578ce4c022f682df4b4d7bc93816b523495e9b78250a327ee0f59786de0734c7",
+      "hash": "ac1f004a635e1a135bf9b7fe5cac1799acb14a724ca1fe1055ebae722d70cfce",
       "type": "form_1040"
     },
     {
       "id": "doc_4",
       "filename": "4_BankStatement_Q4_2025.pdf",
-      "hash": "842027c7e3194e35f4c582d3b937d5faa801a8c3b1df0712273a8572b8326edd",
+      "hash": "70bf15a8c7e384e9016f9b96099db52d34ddc00aaeaf0a9442797977e7375c2d",
       "type": "bank_statement"
     }
   ],
@@ -39,10 +39,10 @@
           "filename": "1_Paystub_2025.pdf",
           "page": 1,
           "bbox": [
-            463,
-            946.8057861328125,
-            706.60595703125,
-            27.1942138671875
+            342.71999999999997,
+            441.36,
+            77.75999999999999,
+            9.719999999999999
           ],
           "confidence": 0.95,
           "field_name": "annualized_gross_ytd"
@@ -62,10 +62,10 @@
           "filename": "1_Paystub_2025.pdf",
           "page": 1,
           "bbox": [
-            1402.1884765625,
-            756.2264404296875,
-            153.4407958984375,
-            31.4676513671875
+            507.96,
+            510.12,
+            49.68,
+            9
           ],
           "confidence": 0.95,
           "field_name": "base_salary_ytd"
@@ -85,10 +85,10 @@
           "filename": "1_Paystub_2025.pdf",
           "page": 1,
           "bbox": [
-            1417.734130859375,
-            803.1921997070312,
-            138.9189453125,
-            29.87762451171875
+            513,
+            493.2,
+            44.64,
+            9
           ],
           "confidence": 0.95,
           "field_name": "bonus_ytd"
@@ -108,10 +108,10 @@
           "filename": "2_W2_Form_2025.pdf",
           "page": 1,
           "bbox": [
-            608.4361572265625,
-            301.10784912109375,
-            334.855224609375,
-            50.964385986328125
+            223.92,
+            614.16,
+            44.64,
+            7.92
           ],
           "confidence": 0.95,
           "field_name": "wages_tips_other_compensation"
@@ -131,10 +131,10 @@
           "filename": "3_Form1040_TaxReturn_2025.pdf",
           "page": 1,
           "bbox": [
-            1126.3143310546875,
-            713.9227294921875,
-            155.5924072265625,
-            36.145263671875
+            408.96,
+            524.1600000000001,
+            49.68,
+            9
           ],
           "confidence": 0.95,
           "field_name": "line1z_wages"
@@ -154,10 +154,10 @@
           "filename": "4_BankStatement_Q4_2025.pdf",
           "page": 1,
           "bbox": [
-            564.8112182617188,
-            518.7540283203125,
-            143.3193359375,
-            33.13922119140625
+            207,
+            595.08,
+            44.64,
+            9
           ],
           "confidence": 0.95,
           "field_name": "total_deposits"
@@ -202,5 +202,5 @@
       "semantics": "net_cash_flow vs gross_taxable_income"
     }
   ],
-  "created_at": "2026-08-19T10:16:42.721537827+08:00"
+  "created_at": "2026-08-20T01:34:00.529253848+08:00"
 }
