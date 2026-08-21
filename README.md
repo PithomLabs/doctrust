@@ -15,11 +15,15 @@ Evidence snapshot (frozen, SHA-256 bound to documents)
         ↓
 Eval engine evaluates against promoted Ruleset (deterministic, no LLM)
         ↓
-Machine finding = REVIEW  (structured, reproducible, auditable)
+Machine Decision = PASS / REVIEW / FAIL  (structured, reproducible, auditable)
         ↓
-Human verifies source in Nutrient Viewer
+Human Review
         ↓
-Final disposition = PASS  (human judgment, not re-evaluation)
+Final Disposition
+        ↓
+Audit artifact (Ruleset identity, decisions, reviews, SHA-256 hash)
+        ↓
+Signed PDF report (cryptographic binding)
 ```
 
 ### Core Invariants
@@ -94,6 +98,7 @@ doctrust/
   policies/                     # Rego policies (reference/migration)
   web/                          # Server UI templates
   scripts/                      # PDF generation
+  plans3/                       # Development history (plans, adversarial reviews)
 ```
 
 ---
@@ -263,6 +268,7 @@ bin/registry
 go build ./...                                          # must compile
 go vet ./...                                            # must be clean
 go test ./...                                           # all tests pass
+go test -race ./...                                     # race detector
 go test ./internal/eval/... -v -run TestRunAllScenarios # 14/14 strict
 bin/regression --domain income_verification             # baseline = 0 changed
 bin/registry                                            # shows all versions
@@ -270,15 +276,26 @@ bin/registry                                            # shows all versions
 
 ---
 
+## Phase 4 — Trust Properties
+
+| Property | Protection |
+|----------|------------|
+| Ruleset identity in audit | `Artifact.SetRuleset()` called in `handleFinalize` and `handleAudit` |
+| Bbox grounding | `buildFactsFromSnapshot` → `parseSourceSpan` → UI, no transform |
+| finding_index validation | `handleReview` validates index against `decision.Results` |
+| Server trust tests | 9 tests in `cmd/server/main_test.go` |
+| Coordinate contract | Documented in `buildFactsFromSnapshot` and `navigateToFinding` |
+
+---
+
 ## Phase Status
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| Phase 1.3 | Frozen | Nutrient integration, evidence normalization, 14/14 strict scenarios |
+| Phase 1 | Frozen | Nutrient integration, evidence normalization, 14/14 strict scenarios |
 | Phase 2 | Frozen | Regression CLI, promote CLI, registry CLI, Ruleset params default |
-| Phase 3 | Pending | LLM Policy Compiler (POLICY.md → Rego) |
-| Phase 4 | Pending | Human Review + Nutrient Viewer integration |
-| Phase 5 | Pending | Signing + Audit Artifact |
+| Phase 3 | Frozen | Authoring pipeline: AST transform, promotion, 5 trust gates, symlink containment |
+| Phase 4 | Frozen | Enriched evaluation UI, audit artifact with ruleset provenance, bbox grounding, server trust tests |
 
 ---
 

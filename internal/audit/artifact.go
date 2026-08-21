@@ -12,6 +12,9 @@ type Artifact struct {
 	Version          string                 `json:"version"`
 	PolicyID         string                 `json:"policy_id"`
 	PolicyHash       string                 `json:"policy_hash"`
+	RulesetID        string                 `json:"ruleset_id"`
+	RulesetVersion   string                 `json:"ruleset_version"`
+	RulesetHash      string                 `json:"ruleset_hash"`
 	Decisions        []Decision             `json:"decisions"`
 	Documents        []DocumentRecord       `json:"documents"`
 	HumanReviews     []HumanReviewRecord    `json:"human_reviews,omitempty"`
@@ -106,6 +109,12 @@ func (a *Artifact) AddHumanReview(r HumanReviewRecord) {
 
 func (a *Artifact) SetFinalDisposition(disposition string) {
 	a.FinalDisposition = disposition
+}
+
+func (a *Artifact) SetRuleset(id, version, hash string) {
+	a.RulesetID = id
+	a.RulesetVersion = version
+	a.RulesetHash = hash
 }
 
 func (a *Artifact) Finalize() {

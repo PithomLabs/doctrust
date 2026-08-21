@@ -166,7 +166,7 @@ func extractSources(doc Document, result *nutrient.ExtractionResult, field strin
 			DocumentID: doc.ID,
 			Filename:   doc.Filename,
 			Page:       citation.PageNumber,
-			BBox:       toPDFPoints(citation.Bbox, scaleX, scaleY, pdfH),
+			BBox:       toViewerCoords(citation.Bbox, scaleX, scaleY),
 			Confidence: citation.Confidence,
 			FieldName:  field,
 		})
@@ -177,7 +177,7 @@ func extractSources(doc Document, result *nutrient.ExtractionResult, field strin
 					DocumentID: doc.ID,
 					Filename:   doc.Filename,
 					Page:       sb.PageNumber,
-					BBox:       toPDFPoints(sb.Bbox, scaleX, scaleY, pdfH),
+					BBox:       toViewerCoords(sb.Bbox, scaleX, scaleY),
 					Confidence: citation.Confidence,
 					FieldName:  field,
 				})
@@ -188,16 +188,11 @@ func extractSources(doc Document, result *nutrient.ExtractionResult, field strin
 	return sources
 }
 
-func toPDFPoints(bbox *nutrient.BBox, scaleX, scaleY, pdfH float64) []float64 {
+func toViewerCoords(bbox *nutrient.BBox, scaleX, scaleY float64) []float64 {
 	if bbox == nil {
 		return nil
 	}
-	// Nutrient bbox: top-left origin. PDF annotation rect: bottom-left origin.
-	x := bbox.X * scaleX
-	yBottom := pdfH - (bbox.Y+bbox.Height)*scaleY
-	w := bbox.Width * scaleX
-	h := bbox.Height * scaleY
-	return []float64{x, yBottom, w, h}
+	return []float64{bbox.X * scaleX, bbox.Y * scaleY, bbox.Width * scaleX, bbox.Height * scaleY}
 }
 
 func toFloat64(v any) float64 {

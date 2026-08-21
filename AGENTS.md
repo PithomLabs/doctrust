@@ -2,7 +2,7 @@
 
 This file is the authoritative reference for AI agents working on this codebase. It defines locked architecture rules, canonical types, and forbidden patterns.
 
-**Phase 3 scope:** LLM Policy Compiler (POLICY.md → Rego generation, compiler tests, Rego validation). See `plans/phase3*.md` for details.
+**Phase status:** Phases 1-4 frozen. See `plans3/` for development history.
 
 ---
 
@@ -20,6 +20,8 @@ These are frozen. Do not modify, reinterpret, or "improve" them.
 8. **Ingestion-agnostic**: the engine does not know or care where evidence comes from.
 9. **No silent failures**: unknown documents → explicit state, never silently dropped.
 10. **Evidence comparison uses set semantics**: not list order. `evidenceEqual()` compares Field+SourceDoc+SourceSpan+Confidence.
+11. **Audit artifact carries Ruleset provenance**: `Artifact.SetRuleset()` must be called in both `handleFinalize` and `handleAudit`. The ruleset hash is computed from the same promoted Ruleset used for evaluation.
+12. **Current coordinate contract**: evidence bboxes are treated as viewer-compatible top-left PDF-point coordinates; no transform is currently applied. Any change to the extraction/viewer coordinate contract requires an explicit verification and regression test.
 
 ---
 
@@ -126,6 +128,30 @@ type ScenarioDiff struct {
     ReasonChanged    bool
     EvidenceChanged  bool
 }
+```
+
+### audit/artifact.go
+
+```go
+type Artifact struct {
+    Version          string                 `json:"version"`
+    PolicyID         string                 `json:"policy_id"`
+    PolicyHash       string                 `json:"policy_hash"`
+    RulesetID        string                 `json:"ruleset_id"`
+    RulesetVersion   string                 `json:"ruleset_version"`
+    RulesetHash      string                 `json:"ruleset_hash"`
+    Decisions        []Decision             `json:"decisions"`
+    Documents        []DocumentRecord       `json:"documents"`
+    HumanReviews     []HumanReviewRecord    `json:"human_reviews,omitempty"`
+    FinalDisposition string                 `json:"final_disposition,omitempty"`
+    CreatedAt        time.Time              `json:"created_at"`
+    CompletedAt      *time.Time             `json:"completed_at,omitempty"`
+    Signatures       []Signature            `json:"signatures,omitempty"`
+    Manifest         Manifest               `json:"manifest"`
+}
+
+func (a *Artifact) SetRuleset(id, version, hash string)
+func (a *Artifact) Finalize()  // computes Manifest.ArtifactHash
 ```
 
 ---
@@ -299,6 +325,10 @@ These are violations. Do not do them.
 - ❌ Silently dropping unknown documents
 - ❌ Returning `results[0]` as the aggregate decision
 - ❌ Using `make test` or `make test-policy` without actual test files
+- ❌ Returning bbox coordinates without verifying they match the viewer coordinate contract
+- ❌ Accepting `finding_index` without validating against current findings
+- ❌ Omitting `Artifact.SetRuleset()` in finalize or audit handlers
+- ❌ Using `PSPDFKit.Annotations.RectangleAnnotation` (use `NutrientViewer.Annotations.RectangleAnnotation`)
 
 ---
 
@@ -324,6 +354,35 @@ bin/registry
 # Dry-run promotion
 bin/promote --domain income_verification --dry-run
 ```
+
+---
+
+## Server Trust Tests
+
+```bash
+# Phase 4 trust property tests
+go test ./cmd/server/... -v
+
+# Specific trust tests
+go test ./cmd/server/... -v -run TestHandleRuleset
+go test ./cmd/server/... -v -run TestHandleEvaluate
+go test ./cmd/server/... -v -run TestHandleFinalize
+go test ./cmd/server/... -v -run TestHandleReview
+```
+
+**Test coverage:**
+
+| Test | Trust property |
+|------|----------------|
+| `TestHandleRuleset_ReturnsLoadedRuleset` | Ruleset identity matches promoted Ruleset |
+| `TestHandleEvaluate_ReturnsEnrichedFields` | Enriched fields present in response |
+| `TestHandleEvaluate_BboxFromSnapshot` | Bbox values flow from snapshot to response |
+| `TestHandleFinalize_ArtifactContainsRulesetProvenance` | Artifact has Ruleset ID/version/hash |
+| `TestHandleReview_InvalidFindingIndex` | Negative index rejected (400) |
+| `TestHandleReview_OutOfRangeFindingIndex` | Out-of-range index rejected (400) |
+| `TestHandleReview_ValidFindingIndex` | Valid review stored correctly |
+| `TestParseSourceSpan` | SourceSpan parsing correctness |
+| `TestBuildFactsFromSnapshot` | Facts construction from snapshot |
 
 ---
 

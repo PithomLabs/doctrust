@@ -29,6 +29,9 @@ func GenerateAuditReport(a *Artifact) ([]byte, error) {
 	info := []struct{ k, v string }{
 		{"Policy ID", a.PolicyID},
 		{"Policy Hash", a.PolicyHash},
+		{"Ruleset ID", a.RulesetID},
+		{"Ruleset Version", a.RulesetVersion},
+		{"Ruleset Hash", a.RulesetHash},
 		{"Version", a.Version},
 		{"Documents", fmt.Sprintf("%d", len(a.Documents))},
 		{"Decisions", fmt.Sprintf("%d", len(a.Decisions))},

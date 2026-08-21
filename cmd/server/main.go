@@ -81,6 +81,8 @@ func main() {
 	mux.HandleFunc("/api/review", handleReview)
 	mux.HandleFunc("/api/reviews", handleReviews)
 	mux.HandleFunc("/api/disposition", handleDisposition)
+	mux.HandleFunc("/api/ruleset", handleRuleset)
+	mux.HandleFunc("/api/regression", handleRegression)
 	mux.HandleFunc("/api/finalize", handleFinalize)
 	mux.HandleFunc("/api/sign", handleSign)
 	mux.HandleFunc("/api/documents/", handleDocument)
@@ -126,6 +128,10 @@ func handleSnapshot(w http.ResponseWriter, r *http.Request) {
 
 // buildFactsFromSnapshot converts an EvidenceGraph into canonical Facts.
 // Preserves all source observations for each claim (not just the first).
+//
+// Coordinate contract: bbox values in the evidence snapshot are already in
+// viewer-compatible coordinates (top-left origin, PDF points). They are
+// passed directly to NutrientViewer.Geometry.Rect with no transform.
 func buildFactsFromSnapshot(snapshot *evidence.EvidenceGraph) facts.Facts {
 	f := make(facts.Facts)
 	for _, c := range snapshot.Claims {
@@ -163,24 +169,87 @@ func loadSnapshot() (*evidence.EvidenceGraph, error) {
 }
 
 // Local HTTP DTOs — these are presentation models, not engine types.
+// All explanation/presentation enrichment lives here, not in internal/eval.
+
 type enrichedSourceRef struct {
-	Filename  string `json:"filename"`
-	FieldName string `json:"field_name"`
+	Filename   string  `json:"filename"`
+	FieldName  string  `json:"field_name"`
+	SourceSpan string  `json:"source_span,omitempty"`
+	Page       int     `json:"page,omitempty"`
+	BBox       []float64 `json:"bbox,omitempty"`
+	Confidence float64 `json:"confidence,omitempty"`
 }
 
 type enrichedFinding struct {
-	Rule     string              `json:"rule"`
-	Severity string              `json:"severity"`
-	ClaimA   string              `json:"claim_a"`
-	ClaimB   string              `json:"claim_b"`
-	ValueA   interface{}         `json:"value_a"`
-	ValueB   interface{}         `json:"value_b"`
-	Sources  []enrichedSourceRef `json:"sources,omitempty"`
+	Rule       string              `json:"rule"`
+	Status     string              `json:"status"`
+	Severity   string              `json:"severity"`
+	Reason     string              `json:"reason"`
+	Confidence float64             `json:"confidence"`
+	Sources    []enrichedSourceRef `json:"sources,omitempty"`
+	Metrics    map[string]any      `json:"metrics,omitempty"`
 }
 
 type enrichedResult struct {
 	Decision string            `json:"decision"`
 	Findings []enrichedFinding `json:"findings"`
+}
+
+// checkDescriptions provides human-readable descriptions for each check.
+// This is presentation-layer metadata — not part of the eval engine.
+var checkDescriptions = map[string]string{
+	"gross_income_consistency":     "Compares paystub projected gross income against W-2 taxable wages. Detects variances and checks if documented bonus compensation explains the gap.",
+	"required_documents":           "Verifies all required document types (paystub, W-2, Form 1040) are present in the evidence snapshot.",
+	"net_vs_gross_incomparability": "Confirms that net cash flow (bank deposits) is correctly treated as incomparable to gross taxable income.",
+}
+
+// parseSourceSpan extracts page and bbox from a source_span string like "page=1;bbox=[508,274,50,8]".
+func parseSourceSpan(span string) (page int, bbox []float64) {
+	if span == "" {
+		return 0, nil
+	}
+	// Parse page
+	for _, part := range splitSpan(span) {
+		if len(part) > 5 && part[:5] == "page=" {
+			fmt.Sscanf(part[5:], "%d", &page)
+		}
+		if len(part) > 5 && part[:5] == "bbox=" {
+			bboxStr := part[5:]
+			bboxStr = strings.Trim(bboxStr, "[]")
+			var b []float64
+			for _, s := range strings.Split(bboxStr, ",") {
+				s = strings.TrimSpace(s)
+				var v float64
+				if _, err := fmt.Sscanf(s, "%f", &v); err == nil {
+					b = append(b, v)
+				}
+			}
+			bbox = b
+		}
+	}
+	return page, bbox
+}
+
+func splitSpan(span string) []string {
+	var parts []string
+	for _, part := range strings.Split(span, ";") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			parts = append(parts, part)
+		}
+	}
+	return parts
+}
+
+// maxConfidence returns the maximum confidence from a list of evidence refs.
+func maxConfidence(refs []evidence.EvidenceRef) float64 {
+	max := 0.0
+	for _, r := range refs {
+		if r.Confidence > max {
+			max = r.Confidence
+		}
+	}
+	return max
 }
 
 func handleEvaluate(w http.ResponseWriter, r *http.Request) {
@@ -202,20 +271,36 @@ func handleEvaluate(w http.ResponseWriter, r *http.Request) {
 	enriched := enrichedResult{Decision: string(decision.Status)}
 	for _, res := range decision.Results {
 		var sources []enrichedSourceRef
+		var totalConfidence float64
+		var confCount int
 		for _, ev := range res.Evidence {
+			page, bbox := parseSourceSpan(ev.SourceSpan)
 			sources = append(sources, enrichedSourceRef{
-				Filename:  ev.SourceDoc,
-				FieldName: ev.Field,
+				Filename:   ev.SourceDoc,
+				FieldName:  ev.Field,
+				SourceSpan: ev.SourceSpan,
+				Page:       page,
+				BBox:       bbox,
+				Confidence: ev.Confidence,
 			})
+			if ev.Confidence > 0 {
+				totalConfidence += ev.Confidence
+				confCount++
+			}
 		}
+		avgConfidence := 0.0
+		if confCount > 0 {
+			avgConfidence = totalConfidence / float64(confCount)
+		}
+
 		ef := enrichedFinding{
-			Rule:     res.CheckID,
-			Severity: string(res.Severity),
-			ClaimA:   res.CheckID,
-			ClaimB:   "",
-			ValueA:   nil,
-			ValueB:   nil,
-			Sources:  sources,
+			Rule:       res.CheckID,
+			Status:     string(res.Status),
+			Severity:   string(res.Severity),
+			Reason:     res.Reason,
+			Confidence: avgConfidence,
+			Sources:    sources,
+			Metrics:    res.Metrics,
 		}
 		enriched.Findings = append(enriched.Findings, ef)
 	}
@@ -249,6 +334,22 @@ func handleReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	snapshot, err := loadSnapshot()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	f := buildFactsFromSnapshot(snapshot)
+	decision, err := evalRunner.Evaluate(r.Context(), loadedRuleset, f)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("evaluate: %v", err), 500)
+		return
+	}
+	if req.FindingIndex < 0 || req.FindingIndex >= len(decision.Results) {
+		http.Error(w, "invalid finding_index", 400)
+		return
+	}
+
 	store.AddReview(&review.HumanReview{
 		FindingIndex: req.FindingIndex,
 		Action:       req.Action,
@@ -267,6 +368,105 @@ func handleReviews(w http.ResponseWriter, r *http.Request) {
 	reviews := store.GetAll()
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(reviews); err != nil {
+		log.Printf("json encode error: %v", err)
+		http.Error(w, "internal error", 500)
+		return
+	}
+}
+
+func handleRuleset(w http.ResponseWriter, r *http.Request) {
+	// Compute ruleset hash
+	hash, err := loadedRuleset.ComputeHash()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("compute hash: %v", err), 500)
+		return
+	}
+
+	// Build check metadata with descriptions
+	type checkInfo struct {
+		ID          string `json:"id"`
+		Version     string `json:"version"`
+		Description string `json:"description"`
+	}
+	var checks []checkInfo
+	for _, ref := range loadedRuleset.Checks {
+		desc := checkDescriptions[ref.ID]
+		checks = append(checks, checkInfo{
+			ID:          ref.ID,
+			Version:     ref.Version,
+			Description: desc,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{
+		"id":             loadedRuleset.ID,
+		"version":        loadedRuleset.Version,
+		"hash":           hash,
+		"checks":         checks,
+		"checks_count":   len(loadedRuleset.Checks),
+	}); err != nil {
+		log.Printf("json encode error: %v", err)
+		http.Error(w, "internal error", 500)
+		return
+	}
+}
+
+func handleRegression(w http.ResponseWriter, r *http.Request) {
+	// Load all scenarios for this domain
+	scenariosDir := filepath.Join("scenarios", loadedRuleset.ID)
+	scenarios, err := eval.LoadAllScenariosFromDir(scenariosDir)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("load scenarios: %v", err), 500)
+		return
+	}
+
+	// Run all scenarios against the loaded ruleset
+	runner := eval.NewRunner(eval.DefaultRegistry().All())
+	results := runner.RunAllScenarios(r.Context(), scenarios)
+
+	// Build response
+	type scenarioResult struct {
+		Name   string `json:"name"`
+		Origin string `json:"origin"`
+		Passed bool   `json:"passed"`
+	}
+	var scenarioResults []scenarioResult
+	passed := 0
+
+	for _, sr := range results {
+		scenarioResults = append(scenarioResults, scenarioResult{
+			Name:   sr.ScenarioName,
+			Origin: "", // will be filled from scenario metadata
+			Passed: sr.Passed,
+		})
+		if sr.Passed {
+			passed++
+		}
+	}
+
+	// Re-count by origin from the scenarios themselves
+	originCounts := map[string]int{}
+	for i, s := range scenarios {
+		originCounts[s.Origin]++
+		if i < len(scenarioResults) {
+			scenarioResults[i].Origin = s.Origin
+		}
+	}
+
+	// Compute ruleset hash for version binding
+	hash, _ := loadedRuleset.ComputeHash()
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{
+		"ruleset_id":      loadedRuleset.ID,
+		"ruleset_version": loadedRuleset.Version,
+		"ruleset_hash":    hash,
+		"total":           len(results),
+		"passed":          passed,
+		"by_origin":       originCounts,
+		"scenarios":       scenarioResults,
+	}); err != nil {
 		log.Printf("json encode error: %v", err)
 		http.Error(w, "internal error", 500)
 		return
@@ -339,6 +539,8 @@ func handleFinalize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	artifact := audit.NewArtifact("income_verification", policyHash)
+	rHash, _ := loadedRuleset.ComputeHash()
+	artifact.SetRuleset(loadedRuleset.ID, loadedRuleset.Version, rHash)
 
 	for _, doc := range snapshot.Documents {
 		artifact.AddDocument(audit.DocumentRecord{
@@ -423,6 +625,8 @@ func handleAudit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	artifact := audit.NewArtifact("income_verification", policyHash)
+	rHash, _ := loadedRuleset.ComputeHash()
+	artifact.SetRuleset(loadedRuleset.ID, loadedRuleset.Version, rHash)
 
 	for _, doc := range snapshot.Documents {
 		artifact.AddDocument(audit.DocumentRecord{

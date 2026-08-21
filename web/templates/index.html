@@ -12,21 +12,33 @@
         .header {
             background: linear-gradient(135deg, #1a1f36 0%, #0d1117 100%);
             border-bottom: 1px solid #30363d;
-            padding: 20px 32px;
+            padding: 16px 32px;
             display: flex; align-items: center; gap: 16px;
         }
-        .header h1 { font-size: 24px; font-weight: 600; color: #f0f6fc; }
-        .header .subtitle { color: #8b949e; font-size: 14px; }
+        .header h1 { font-size: 22px; font-weight: 600; color: #f0f6fc; }
+        .header .subtitle { color: #8b949e; font-size: 13px; }
         .header .badge {
-            background: #238636; color: white; padding: 4px 12px;
-            border-radius: 12px; font-size: 12px; font-weight: 600;
+            background: #238636; color: white; padding: 3px 10px;
+            border-radius: 12px; font-size: 11px; font-weight: 600;
         }
+
+        /* Dashboard context bar */
+        .dashboard-bar {
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 10px 32px;
+            display: flex; align-items: center; gap: 24px;
+            font-size: 13px; color: #8b949e;
+        }
+        .dashboard-bar .case-info { display: flex; align-items: center; gap: 8px; }
+        .dashboard-bar .case-label { color: #f0f6fc; font-weight: 500; }
+        .dashboard-bar .separator { color: #30363d; }
 
         /* Persistent state bar */
         .state-bar {
-            background: #161b22;
+            background: #0d1117;
             border-bottom: 1px solid #30363d;
-            padding: 12px 32px;
+            padding: 10px 32px;
             display: flex; align-items: center; gap: 24px;
         }
         .state-bar .disposition {
@@ -34,7 +46,7 @@
             flex: 1;
         }
         .state-bar .badge {
-            font-size: 14px; padding: 6px 16px; font-weight: 600;
+            font-size: 13px; padding: 5px 14px; font-weight: 600;
         }
         .state-bar .badge.review { background: #d29922; color: #0d1117; }
         .state-bar .badge.pass { background: #238636; color: white; }
@@ -43,14 +55,14 @@
             display: flex; align-items: center; gap: 12px;
         }
         .state-bar .btn-finalize {
-            background: #238636; color: white; border: none; padding: 10px 20px;
-            border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;
+            background: #238636; color: white; border: none; padding: 8px 18px;
+            border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
         }
         .state-bar .btn-finalize:hover:not(:disabled) { background: #2ea043; }
         .state-bar .btn-finalize:disabled { background: #30363d; color: #6e7681; cursor: not-allowed; }
         .state-bar .signing-status { font-size: 12px; color: #8b949e; }
 
-        .layout { display: grid; grid-template-columns: 1fr 420px; height: calc(100vh - 128px); }
+        .layout { display: grid; grid-template-columns: 1fr 420px; height: calc(100vh - 152px); }
 
         .viewer-panel {
             background: #161b22;
@@ -59,7 +71,7 @@
         }
         .viewer-toolbar {
             background: #161b22; border-bottom: 1px solid #30363d;
-            padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+            padding: 10px 16px; display: flex; align-items: center; gap: 12px;
         }
         .viewer-toolbar select {
             background: #21262d; color: #e1e4e8; border: 1px solid #30363d;
@@ -75,32 +87,31 @@
             display: flex; border-bottom: 1px solid #30363d;
         }
         .panel-tab {
-            flex: 1; padding: 12px; text-align: center; cursor: pointer;
-            font-size: 13px; font-weight: 500; color: #8b949e;
+            flex: 1; padding: 10px 8px; text-align: center; cursor: pointer;
+            font-size: 12px; font-weight: 500; color: #8b949e;
             border-bottom: 2px solid transparent; transition: all 0.2s;
         }
         .panel-tab.active { color: #f0f6fc; border-bottom-color: #58a6ff; }
         .panel-tab:hover { color: #f0f6fc; }
 
-        .panel-content { flex: 1; overflow-y: auto; padding: 16px; }
+        .panel-content { flex: 1; overflow-y: auto; padding: 14px; }
 
         .decision-card {
             background: #21262d; border: 1px solid #30363d; border-radius: 8px;
-            padding: 16px; margin-bottom: 12px;
+            padding: 14px; margin-bottom: 10px;
         }
         .decision-card.pass { border-left: 3px solid #238636; }
         .decision-card.fail { border-left: 3px solid #da3633; }
         .decision-card.review { border-left: 3px solid #d29922; }
 
-        .decision-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .decision-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
         .decision-state {
-            font-size: 12px; font-weight: 600; padding: 2px 8px;
+            font-size: 11px; font-weight: 600; padding: 2px 8px;
             border-radius: 4px; text-transform: uppercase;
         }
         .state-pass { background: #238636; color: white; }
         .state-fail { background: #da3633; color: white; }
         .state-review { background: #d29922; color: #0d1117; }
-        .state-missing { background: #6e7681; color: white; }
 
         .finding-card {
             background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
@@ -109,28 +120,63 @@
         .finding-card:hover { border-color: #58a6ff; background: #161b22; }
         .finding-card.active { border-color: #58a6ff; background: #1c2128; }
 
-        .finding-rule { font-size: 13px; font-weight: 500; color: #f0f6fc; margin-bottom: 4px; }
+        .finding-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .finding-rule { font-size: 13px; font-weight: 500; color: #f0f6fc; }
+        .finding-status {
+            font-size: 10px; padding: 1px 6px; border-radius: 3px;
+            text-transform: uppercase; font-weight: 600;
+        }
         .finding-severity {
-            font-size: 11px; padding: 1px 6px; border-radius: 3px;
+            font-size: 10px; padding: 1px 6px; border-radius: 3px;
             text-transform: uppercase; font-weight: 600;
         }
         .severity-high { background: #da3633; color: white; }
         .severity-medium { background: #d29922; color: #0d1117; }
         .severity-low { background: #30363d; color: #8b949e; }
 
-        .finding-values {
-            font-family: 'SF Mono', monospace; font-size: 12px; color: #8b949e;
-            margin-top: 8px;
+        .finding-reason {
+            font-size: 12px; color: #c9d1d9; margin: 6px 0;
+            line-height: 1.4;
         }
-        .finding-values span { color: #58a6ff; }
+
+        .finding-sources {
+            font-size: 11px; color: #8b949e; margin-top: 6px;
+        }
+        .finding-sources .source-item {
+            display: flex; align-items: center; gap: 6px;
+            padding: 3px 0;
+        }
+        .finding-sources .source-doc { color: #58a6ff; font-weight: 500; }
+        .finding-sources .source-field { color: #8b949e; }
+        .finding-sources .source-page { color: #6e7681; }
+
+        .finding-confidence {
+            font-size: 11px; color: #8b949e; margin-top: 4px;
+        }
+        .confidence-bar {
+            display: inline-block; width: 60px; height: 4px;
+            background: #30363d; border-radius: 2px; vertical-align: middle;
+            margin-left: 4px;
+        }
+        .confidence-fill {
+            height: 100%; border-radius: 2px;
+            background: #238636;
+        }
+
+        .finding-metrics {
+            font-family: 'SF Mono', monospace; font-size: 11px; color: #6e7681;
+            margin-top: 6px; padding: 6px 8px;
+            background: #161b22; border-radius: 4px;
+        }
+        .finding-metrics span { color: #58a6ff; }
 
         /* Inline review actions */
         .finding-actions {
-            margin-top: 12px; padding-top: 12px; border-top: 1px solid #30363d;
-            display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+            margin-top: 10px; padding-top: 10px; border-top: 1px solid #30363d;
+            display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
         }
         .finding-actions .btn-sm {
-            padding: 6px 12px; font-size: 12px; font-weight: 500; border-radius: 4px;
+            padding: 5px 10px; font-size: 11px; font-weight: 500; border-radius: 4px;
             border: none; cursor: pointer;
         }
         .btn-confirm { background: #238636; color: white; }
@@ -140,12 +186,12 @@
         .btn-override { background: #d29922; color: #0d1117; }
         .btn-override:hover { background: #e3b341; }
         .finding-note {
-            flex: 1; min-width: 200px;
+            flex: 1; min-width: 180px;
             background: #0d1117; border: 1px solid #30363d; color: #e1e4e8;
-            padding: 6px 10px; border-radius: 4px; font-size: 12px;
+            padding: 5px 8px; border-radius: 4px; font-size: 11px;
         }
         .finding-note:focus { outline: none; border-color: #58a6ff; }
-        .finding-resolved { font-size: 11px; color: #8b949e; margin-left: 8px; }
+        .finding-resolved { font-size: 10px; color: #8b949e; margin-left: 6px; }
 
         .doc-card {
             background: #21262d; border: 1px solid #30363d; border-radius: 8px;
@@ -166,6 +212,54 @@
             max-height: 300px; overflow-y: auto;
         }
 
+        /* Trust Pipeline styles */
+        .pipeline-card {
+            background: #21262d; border: 1px solid #30363d; border-radius: 8px;
+            padding: 14px; margin-bottom: 10px;
+        }
+        .pipeline-header {
+            font-size: 13px; font-weight: 600; color: #f0f6fc; margin-bottom: 8px;
+        }
+        .pipeline-stat {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 6px 0; border-bottom: 1px solid #21262d;
+            font-size: 12px;
+        }
+        .pipeline-stat:last-child { border-bottom: none; }
+        .pipeline-stat .label { color: #8b949e; }
+        .pipeline-stat .value { color: #f0f6fc; font-weight: 500; }
+        .pipeline-stat .value.pass { color: #238636; }
+        .pipeline-stat .value.fail { color: #da3633; }
+
+        .scenario-list { margin-top: 10px; }
+        .scenario-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 8px; margin-bottom: 4px;
+            background: #161b22; border-radius: 4px;
+            font-size: 12px;
+        }
+        .scenario-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .scenario-dot.pass { background: #238636; }
+        .scenario-dot.fail { background: #da3633; }
+        .scenario-name { color: #c9d1d9; flex: 1; }
+        .scenario-origin {
+            font-size: 10px; padding: 1px 6px; border-radius: 3px;
+            text-transform: uppercase; font-weight: 600;
+        }
+        .origin-real { background: #1f6feb33; color: #58a6ff; }
+        .origin-adversarial { background: #da363333; color: #f85149; }
+
+        .check-card {
+            background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+            padding: 10px; margin-bottom: 6px;
+        }
+        .check-id { font-size: 12px; font-weight: 500; color: #58a6ff; }
+        .check-desc { font-size: 11px; color: #8b949e; margin-top: 4px; line-height: 1.4; }
+        .check-meta { font-size: 10px; color: #6e7681; margin-top: 4px; }
+
         .btn {
             background: #238636; color: white; border: none; padding: 8px 16px;
             border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer;
@@ -183,24 +277,38 @@
             display: flex; align-items: center; justify-content: center;
             height: 100%; color: #8b949e;
         }
-
-        .annotation-highlight {
-            stroke: #ffd700; stroke-width: 2; fill: #ffd700; fill-opacity: 0.2;
-        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>DocTrust</h1>
         <span class="subtitle">Universal Document Trust Engine</span>
-        <span class="badge">OPA + Nutrient DWS</span>
+        <span class="badge">Phase 4 — Explainable Evaluation</span>
+    </div>
+
+    <!-- Dashboard Context Bar -->
+    <div class="dashboard-bar" id="dashboardBar">
+        <div class="case-info">
+            <span class="case-label">Case:</span>
+            <span id="caseId">Loading...</span>
+        </div>
+        <span class="separator">|</span>
+        <div class="case-info">
+            <span class="case-label">Ruleset:</span>
+            <span id="rulesetInfo">—</span>
+        </div>
+        <span class="separator">|</span>
+        <div class="case-info">
+            <span class="case-label">Pipeline:</span>
+            <span id="pipelineInfo">—</span>
+        </div>
     </div>
 
     <!-- Persistent State Bar -->
     <div class="state-bar" id="stateBar">
         <div class="disposition">
             <span id="finalBadge" class="badge review">FINAL: REVIEW</span>
-            <span style="color: #8b949e; font-size: 13px;" id="opaBadge">OPA: —</span>
+            <span style="color: #8b949e; font-size: 13px;" id="opaBadge">Engine: —</span>
         </div>
         <div class="actions">
             <button class="btn btn-finalize" id="btnFinalize" onclick="finalizeAndSign()" disabled>Finalize & Sign</button>
@@ -224,9 +332,10 @@
 
         <div class="side-panel">
             <div class="panel-tabs">
-                <div class="panel-tab active" onclick="showTab('findings')">Findings</div>
-                <div class="panel-tab" onclick="showTab('documents')">Documents</div>
-                <div class="panel-tab" onclick="showTab('audit')">Audit</div>
+                <div class="panel-tab active" data-tab="findings" onclick="showTab('findings')">Findings</div>
+                <div class="panel-tab" data-tab="trust" onclick="showTab('trust')">Trust Pipeline</div>
+                <div class="panel-tab" data-tab="documents" onclick="showTab('documents')">Documents</div>
+                <div class="panel-tab" data-tab="audit" onclick="showTab('audit')">Audit</div>
             </div>
             <div class="panel-content" id="panelContent">
                 <div id="loadingFindings">Loading evaluation...</div>
@@ -239,21 +348,41 @@
         let currentSnapshot = null;
         let currentResult = null;
         let currentAudit = null;
+        let currentRuleset = null;
+        let currentRegression = null;
         let currentTab = 'findings';
         let currentAnnotation = null;
         let selectedFindingIndex = -1;
 
         async function init() {
             try {
-                const resp = await fetch('/api/snapshot');
-                currentSnapshot = await resp.json();
+                // Fetch all data in parallel
+                const [snapshotResp, rulesetResp] = await Promise.all([
+                    fetch('/api/snapshot'),
+                    fetch('/api/ruleset')
+                ]);
+                currentSnapshot = await snapshotResp.json();
+                currentRuleset = await rulesetResp.json();
+
                 populateDocSelect();
+                updateDashboard();
                 await runEvaluation();
+
                 if (currentSnapshot.documents && currentSnapshot.documents.length > 0) {
-                    loadDocument(currentSnapshot.documents[0].file_name);
+                    loadDocument(currentSnapshot.documents[0].filename || currentSnapshot.documents[0].file_name);
                 }
             } catch (e) {
                 console.error('Init error:', e);
+            }
+        }
+
+        function updateDashboard() {
+            const caseId = currentSnapshot.case_id || 'Unknown';
+            document.getElementById('caseId').textContent = caseId;
+
+            if (currentRuleset) {
+                document.getElementById('rulesetInfo').textContent =
+                    `${currentRuleset.id} v${currentRuleset.version} (${currentRuleset.checks_count} checks)`;
             }
         }
 
@@ -263,8 +392,9 @@
             if (currentSnapshot && currentSnapshot.documents) {
                 currentSnapshot.documents.forEach(doc => {
                     const opt = document.createElement('option');
-                    opt.value = doc.file_name;
-                    opt.textContent = `${doc.file_name} (${doc.document_type})`;
+                    const name = doc.filename || doc.file_name;
+                    opt.value = name;
+                    opt.textContent = `${name} (${doc.type || doc.document_type})`;
                     select.appendChild(opt);
                 });
             }
@@ -316,15 +446,29 @@
             }
         }
 
+        async function loadRegression() {
+            if (currentRegression) return currentRegression;
+            try {
+                const resp = await fetch('/api/regression');
+                currentRegression = await resp.json();
+                return currentRegression;
+            } catch (e) {
+                console.error('Regression error:', e);
+                return null;
+            }
+        }
+
         function showTab(tab) {
             currentTab = tab;
-            document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
-            document.querySelector(`.panel-tab:nth-child(${tab === 'findings' ? 1 : tab === 'documents' ? 2 : 3})`).classList.add('active');
+            document.querySelectorAll('.panel-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.tab === tab);
+            });
             renderPanel();
         }
 
         function renderPanel() {
             if (currentTab === 'findings') renderFindings();
+            else if (currentTab === 'trust') renderTrustPipeline();
             else if (currentTab === 'documents') renderDocuments();
             else if (currentTab === 'audit') renderAudit();
         }
@@ -343,26 +487,66 @@
                 <div class="decision-card ${stateClass}">
                     <div class="decision-header">
                         <span class="decision-state state-${state.toLowerCase()}">${state}</span>
-                        <span style="color: #8b949e; font-size: 13px;">Policy Decision</span>
+                        <span style="color: #8b949e; font-size: 12px;">Engine Decision</span>
                     </div>
                 </div>
             `;
 
             if (currentResult.findings && currentResult.findings.length > 0) {
                 currentResult.findings.forEach((f, i) => {
-                    const sevClass = f.severity === 'high' ? 'high' : f.severity === 'medium' ? 'medium' : 'low';
+                    const sevClass = f.severity === 'BLOCKING' ? 'high' : f.severity === 'WARNING' ? 'medium' : 'low';
+                    const statusClass = f.status === 'PASS' ? 'pass' : f.status === 'FAIL' ? 'fail' : 'review';
                     const hasReview = hasReviewForFinding(i);
                     const review = getReviewForFinding(i);
-                    
+
+                    // Build sources HTML
+                    let sourcesHtml = '';
+                    if (f.sources && f.sources.length > 0) {
+                        sourcesHtml = '<div class="finding-sources">';
+                        f.sources.forEach(s => {
+                            const pageInfo = s.page ? `page ${s.page}` : '';
+                            sourcesHtml += `<div class="source-item">
+                                <span class="source-doc">${s.filename}</span>
+                                <span class="source-field">→ ${s.field_name}</span>
+                                ${pageInfo ? `<span class="source-page">${pageInfo}</span>` : ''}
+                            </div>`;
+                        });
+                        sourcesHtml += '</div>';
+                    }
+
+                    // Confidence display
+                    let confHtml = '';
+                    if (f.confidence > 0) {
+                        const pct = Math.round(f.confidence * 100);
+                        confHtml = `<div class="finding-confidence">
+                            Confidence: ${pct}%
+                            <span class="confidence-bar"><span class="confidence-fill" style="width:${pct}%"></span></span>
+                        </div>`;
+                    }
+
+                    // Metrics display
+                    let metricsHtml = '';
+                    if (f.metrics && Object.keys(f.metrics).length > 0) {
+                        const entries = Object.entries(f.metrics)
+                            .filter(([k, v]) => typeof v !== 'object')
+                            .map(([k, v]) => `<span>${k}</span>: ${typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(1)) : v}`)
+                            .join(' · ');
+                        if (entries) {
+                            metricsHtml = `<div class="finding-metrics">${entries}</div>`;
+                        }
+                    }
+
                     html += `
                         <div class="finding-card ${i === selectedFindingIndex ? 'active' : ''}" onclick="navigateToFinding(${i})">
-                            <div class="finding-rule">${f.rule}</div>
-                            <span class="finding-severity severity-${sevClass}">${f.severity}</span>
-                            <div class="finding-values">
-                                <span>${f.claim_a}</span> = ${f.value_a}<br>
-                                <span>${f.claim_b}</span> = ${f.value_b}<br>
-                                Variance: ${f.variance ? f.variance.toFixed(1) : '0.0'}%
+                            <div class="finding-header">
+                                <div class="finding-rule">${f.rule}</div>
+                                <span class="finding-status state-${statusClass}">${f.status}</span>
+                                <span class="finding-severity severity-${sevClass}">${f.severity}</span>
                             </div>
+                            <div class="finding-reason">${f.reason}</div>
+                            ${sourcesHtml}
+                            ${confHtml}
+                            ${metricsHtml}
                             <div class="finding-actions">
                                 <button class="btn-sm btn-confirm" onclick="event.stopPropagation(); submitReview(${i}, 'confirm')">Confirm</button>
                                 <button class="btn-sm btn-reject" onclick="event.stopPropagation(); submitReview(${i}, 'reject')">Reject</button>
@@ -379,6 +563,115 @@
 
             container.innerHTML = html;
             updateStateBar();
+        }
+
+        async function renderTrustPipeline() {
+            const container = document.getElementById('panelContent');
+
+            if (!currentRuleset) {
+                container.innerHTML = '<div class="empty-state"><h3>Loading ruleset...</h3></div>';
+                return;
+            }
+
+            // Fetch regression data
+            const regression = await loadRegression();
+
+            let html = '';
+
+            // Ruleset identity card (version-bound)
+            html += `
+                <div class="pipeline-card">
+                    <div class="pipeline-header">Active Ruleset</div>
+                    <div class="pipeline-stat">
+                        <span class="label">Domain</span>
+                        <span class="value">${currentRuleset.id}</span>
+                    </div>
+                    <div class="pipeline-stat">
+                        <span class="label">Version</span>
+                        <span class="value">v${currentRuleset.version}</span>
+                    </div>
+                    <div class="pipeline-stat">
+                        <span class="label">Hash</span>
+                        <span class="value" style="font-family:monospace;font-size:10px;">${currentRuleset.hash.substring(0, 16)}...</span>
+                    </div>
+                    <div class="pipeline-stat">
+                        <span class="label">Active Checks</span>
+                        <span class="value">${currentRuleset.checks_count}</span>
+                    </div>
+                </div>
+            `;
+
+            // Scenario results (if regression data loaded)
+            if (regression) {
+                const total = regression.total || 0;
+                const passed = regression.passed || 0;
+                const failed = total - passed;
+                const realCount = regression.by_origin?.real_fixture || 0;
+                const adversarialCount = regression.by_origin?.human_adversarial || 0;
+
+                html += `
+                    <div class="pipeline-card">
+                        <div class="pipeline-header">Regression Results</div>
+                        <div class="pipeline-stat">
+                            <span class="label">Total Scenarios</span>
+                            <span class="value">${total}</span>
+                        </div>
+                        <div class="pipeline-stat">
+                            <span class="label">Passed</span>
+                            <span class="value pass">${passed}/${total}</span>
+                        </div>
+                        <div class="pipeline-stat">
+                            <span class="label">Real Fixture</span>
+                            <span class="value">${realCount} scenarios</span>
+                        </div>
+                        <div class="pipeline-stat">
+                            <span class="label">Human-Adversarial</span>
+                            <span class="value">${adversarialCount} scenarios · all pass</span>
+                        </div>
+                    </div>
+                `;
+
+                // Scenario list
+                if (regression.scenarios && regression.scenarios.length > 0) {
+                    html += '<div class="scenario-list">';
+                    regression.scenarios.forEach(s => {
+                        const dotClass = s.passed ? 'pass' : 'fail';
+                        const originClass = s.origin === 'human_adversarial' ? 'adversarial' : 'real';
+                        html += `
+                            <div class="scenario-item">
+                                <span class="scenario-dot ${dotClass}"></span>
+                                <span class="scenario-name">${s.name}</span>
+                                <span class="scenario-origin origin-${originClass}">${s.origin === 'human_adversarial' ? 'adversarial' : 'real'}</span>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                }
+            } else {
+                html += `
+                    <div class="pipeline-card">
+                        <div class="pipeline-header">Regression Results</div>
+                        <div style="color:#8b949e;font-size:12px;">Loading scenario results...</div>
+                    </div>
+                `;
+            }
+
+            // Check descriptions
+            if (currentRuleset.checks && currentRuleset.checks.length > 0) {
+                html += '<div style="margin-top:12px;">';
+                html += '<div class="pipeline-header">Active Checks</div>';
+                currentRuleset.checks.forEach(c => {
+                    html += `
+                        <div class="check-card">
+                            <div class="check-id">${c.id} <span style="color:#6e7681;font-weight:normal;">v${c.version}</span></div>
+                            <div class="check-desc">${c.description || 'No description available.'}</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            container.innerHTML = html;
         }
 
         function hasReviewForFinding(index) {
@@ -405,16 +698,12 @@
                     body: JSON.stringify({ finding_index: findingIndex, action, note })
                 });
                 if (!resp.ok) throw new Error('Review failed');
-                
+
                 // Refresh audit to get updated reviews
                 const auditResp = await fetch('/api/audit');
                 currentAudit = await auditResp.json();
-                
-                // Re-evaluate disposition
-                const dispResp = await fetch('/api/disposition');
-                const disp = await dispResp.json();
-                
-                renderFindings(); // Re-render with updated review state
+
+                renderFindings();
             } catch (e) {
                 console.error('Review error:', e);
                 alert('Failed to submit review: ' + e.message);
@@ -430,11 +719,12 @@
 
             let html = '';
             currentSnapshot.documents.forEach(doc => {
-                const hash = doc.sha256_hash ? doc.sha256_hash.substring(0, 16) + '...' : 'N/A';
+                const name = doc.filename || doc.file_name;
+                const hash = doc.hash ? doc.hash.substring(0, 16) + '...' : 'N/A';
                 html += `
-                    <div class="doc-card" onclick="loadDocument('${doc.file_name}')">
-                        <div class="doc-name">${doc.file_name}</div>
-                        <div class="doc-type">${doc.document_type}</div>
+                    <div class="doc-card" onclick="loadDocument('${name}')">
+                        <div class="doc-name">${name}</div>
+                        <div class="doc-type">${doc.type || doc.document_type}</div>
                         <div class="doc-hash">SHA-256: ${hash}</div>
                     </div>
                 `;
@@ -484,11 +774,14 @@
             const finding = currentResult.findings[index];
             if (!finding.sources || finding.sources.length === 0) return;
 
-            const source = finding.sources[0]; // Use first source
-            const page = source.page;
-            const bbox = source.bbox; // [x, y, w, h] in PDF points, bottom-left origin
+            // Find first source with valid page + bbox
+            const source = finding.sources.find(s => s.page && s.bbox && s.bbox.length >= 4) || finding.sources[0];
+            if (!source || !source.page) return;
 
-            if (!viewer || !bbox) return;
+            const page = source.page;
+            const bbox = source.bbox;
+
+            if (!viewer || !bbox || bbox.length < 4) return;
 
             // Clear previous annotation
             if (currentAnnotation) {
@@ -499,16 +792,21 @@
             // Navigate to page (1-indexed)
             viewer.setPageNumber(page);
 
-            // Add highlight annotation
-            // bbox is [x, y, w, h] in PDF points (bottom-left origin)
-            // Nutrient RectangleAnnotation expects rect in PDF coordinates
+            // Coordinate contract: bbox values from the evidence snapshot are
+            // in viewer-compatible coordinates (top-left origin, PDF points).
+            // Pass directly to NutrientViewer.Geometry.Rect with no transform.
             try {
-                const rect = { x: bbox[0], y: bbox[1], width: bbox[2], height: bbox[3] };
-                currentAnnotation = new PSPDFKit.Annotations.RectangleAnnotation({
+                const rect = new NutrientViewer.Geometry.Rect({
+                    left: bbox[0],
+                    top: bbox[1],
+                    width: bbox[2],
+                    height: bbox[3],
+                });
+                currentAnnotation = new NutrientViewer.Annotations.RectangleAnnotation({
                     pageIndex: page - 1,
-                    rect: rect,
-                    fillColor: PSPDFKit.Color.ofRGBA(1, 0.84, 0, 0.3),
-                    strokeColor: PSPDFKit.Color.ofRGBA(1, 0.84, 0, 1),
+                    boundingBox: rect,
+                    fillColor: new NutrientViewer.Color({ r: 255, g: 214, b: 0, a: 0.3 }),
+                    strokeColor: new NutrientViewer.Color({ r: 255, g: 214, b: 0, a: 1 }),
                     strokeWidth: 2,
                 });
                 viewer.annotationManager.add(currentAnnotation);
@@ -523,15 +821,20 @@
             const finalBadge = document.getElementById('finalBadge');
             const opaBadge = document.getElementById('opaBadge');
             const btnFinalize = document.getElementById('btnFinalize');
+            const pipelineInfo = document.getElementById('pipelineInfo');
 
             const opaDecision = currentResult.decision || 'UNKNOWN';
-            opaBadge.textContent = `OPA: ${opaDecision}`;
+            opaBadge.textContent = `Engine: ${opaDecision}`;
+
+            // Update pipeline info in dashboard
+            if (currentRuleset) {
+                pipelineInfo.textContent = `${currentRuleset.id} v${currentRuleset.version}`;
+            }
 
             // Check if all findings have reviews
             const allReviewed = currentResult.findings && currentResult.findings.every((f, i) => hasReviewForFinding(i));
-            
+
             if (allReviewed && currentResult.findings && currentResult.findings.length > 0) {
-                // Fetch disposition
                 fetch('/api/disposition')
                     .then(r => r.json())
                     .then(d => {
@@ -554,27 +857,23 @@
             status.textContent = 'Finalizing...';
 
             try {
-                // Finalize
                 const finalizeResp = await fetch('/api/finalize', { method: 'POST' });
                 const finalizeData = await finalizeResp.json();
                 if (!finalizeResp.ok) throw new Error(finalizeData.error || 'Finalize failed');
 
                 status.textContent = 'Signing with Nutrient DWS...';
-                
-                // Sign
+
                 const signResp = await fetch('/api/sign', { method: 'POST' });
                 const signData = await signResp.json();
                 if (!signResp.ok) throw new Error(signData.error || 'Signing failed');
 
                 status.textContent = `✓ Signed (${signData.signed_hash.substring(0,16)}...)`;
-                
-                // Offer download
+
                 const a = document.createElement('a');
                 a.href = `/api/documents/${signData.signed_path.split('/').pop()}`;
                 a.download = 'audit_report_signed.pdf';
                 a.click();
-                
-                // Update audit view
+
                 await showAudit();
             } catch (e) {
                 console.error('Finalize/Sign error:', e);

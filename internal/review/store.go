@@ -85,7 +85,7 @@ func ComputeFinalDisposition(opaState string, findings []Finding, reviews map[in
 		return "REVIEW"
 	}
 
-	for i, f := range findings {
+	for i := range findings {
 		review, ok := reviews[i]
 		if !ok {
 			return "REVIEW"
@@ -96,10 +96,9 @@ func ComputeFinalDisposition(opaState string, findings []Finding, reviews map[in
 		case ActionOverride:
 			continue
 		case ActionConfirm:
-			if f.Rule == "gross_income_consistency" && review.Note != "" {
-				continue
-			}
-			return "FAIL"
+			// Confirm means the human agrees this finding is correct.
+			// Continue checking remaining findings.
+			continue
 		}
 	}
 
