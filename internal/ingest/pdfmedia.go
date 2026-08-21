@@ -1,4 +1,4 @@
-package evidence
+package ingest
 
 import (
 	"fmt"

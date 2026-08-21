@@ -1,48 +1,49 @@
-package evidence
+package ingest
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/doctrust/doctrust/internal/evidence"
 	"github.com/doctrust/doctrust/internal/extraction"
 	"github.com/doctrust/doctrust/internal/nutrient"
 )
 
-// Normalizer converts Nutrient extraction output into claims and relationships.
-type Normalizer struct {
+// EvidenceNormalizer converts Nutrient extraction output into claims and relationships.
+type EvidenceNormalizer struct {
 	configs map[nutrient.DocumentType]extraction.ExtractionConfig
 }
 
-// NewNormalizer creates a normalizer with income verification configs.
-func NewNormalizer() *Normalizer {
-	return &Normalizer{
+// NewEvidenceNormalizer creates a normalizer with income verification configs.
+func NewEvidenceNormalizer() *EvidenceNormalizer {
+	return &EvidenceNormalizer{
 		configs: extraction.IncomeVerificationConfigs(),
 	}
 }
 
 // Normalize takes a Nutrient extraction result and produces claims.
-func (n *Normalizer) Normalize(doc Document, result *nutrient.ExtractionResult, pdfW, pdfH float64) []Claim {
+func (n *EvidenceNormalizer) Normalize(doc evidence.Document, result *nutrient.ExtractionResult, pdfW, pdfH float64) []evidence.Claim {
 	config, ok := n.configs[result.DocumentType]
 	if !ok {
 		return nil
 	}
 
-	var claims []Claim
+	var claims []evidence.Claim
 	for field, norm := range config.FieldMapping {
 		value, ok := result.Fields[field]
 		if !ok {
 			continue
 		}
 
-		claim := Claim{
+		claim := evidence.Claim{
 			ID:           fmt.Sprintf("%s.%s", result.DocumentType, field),
 			Field:        field,
 			SemanticType: norm.SemanticType,
 			Value:        extraction.ParseCurrencyValue(value),
 			ValueType:    norm.ValueType,
 			Sources:      extractSources(doc, result, field, pdfW, pdfH),
-			Status:       ClaimSingular,
+			Status:       evidence.ClaimSingular,
 		}
 		claims = append(claims, claim)
 	}
@@ -50,25 +51,23 @@ func (n *Normalizer) Normalize(doc Document, result *nutrient.ExtractionResult, 
 }
 
 // BuildRelationships analyzes claims and produces cross-document relationships.
-func (n *Normalizer) BuildRelationships(claims []Claim) []Relationship {
-	var rels []Relationship
+func (n *EvidenceNormalizer) BuildRelationships(claims []evidence.Claim) []evidence.Relationship {
+	var rels []evidence.Relationship
 
-	// Group claims by semantic type
-	byType := make(map[string][]Claim)
+	byType := make(map[string][]evidence.Claim)
 	for _, c := range claims {
 		byType[c.SemanticType] = append(byType[c.SemanticType], c)
 	}
 
-	// Corroboration: multiple claims with same semantic type
 	for stype, group := range byType {
 		if len(group) < 2 {
 			continue
 		}
 		for i := 0; i < len(group); i++ {
 			for j := i + 1; j < len(group); j++ {
-				rels = append(rels, Relationship{
+				rels = append(rels, evidence.Relationship{
 					ID:     fmt.Sprintf("rel_%s_%s_%s", stype, group[i].ID, group[j].ID),
-					Type:   RelCorroboration,
+					Type:   evidence.RelCorroboration,
 					ClaimA: group[i].ID,
 					ClaimB: group[j].ID,
 				})
@@ -76,7 +75,6 @@ func (n *Normalizer) BuildRelationships(claims []Claim) []Relationship {
 		}
 	}
 
-	// Variance and incomparable: compare claims across semantic types
 	if paystubConfig, ok := n.configs[nutrient.DocTypePaystub]; ok {
 		for _, norm := range paystubConfig.FieldMapping {
 			if norm.CompareWith == "" {
@@ -88,7 +86,6 @@ func (n *Normalizer) BuildRelationships(claims []Claim) []Relationship {
 				continue
 			}
 
-			// Check if both are currency
 			if projected.ValueType != "currency" || taxable.ValueType != "currency" {
 				continue
 			}
@@ -104,20 +101,19 @@ func (n *Normalizer) BuildRelationships(claims []Claim) []Relationship {
 				diff = -diff
 			}
 
-			rels = append(rels, Relationship{
+			rels = append(rels, evidence.Relationship{
 				ID:     fmt.Sprintf("rel_%s_%s", projected.ID, taxable.ID),
-				Type:   RelVariance,
+				Type:   evidence.RelVariance,
 				ClaimA: projected.ID,
 				ClaimB: taxable.ID,
 				Delta:  diff,
 			})
 
-			// Derived from: gross_ytd includes bonus
 			bonus := findClaimBySemanticType(claims, "bonus_compensation")
 			if bonus != nil {
-				rels = append(rels, Relationship{
+				rels = append(rels, evidence.Relationship{
 					ID:        fmt.Sprintf("rel_derived_%s_%s", projected.ID, bonus.ID),
-					Type:      RelDerivedFrom,
+					Type:      evidence.RelDerivedFrom,
 					ClaimA:    projected.ID,
 					ClaimB:    bonus.ID,
 					Semantics: "gross_ytd includes bonus_compensation",
@@ -126,14 +122,13 @@ func (n *Normalizer) BuildRelationships(claims []Claim) []Relationship {
 		}
 	}
 
-	// Incomparable: net_cash_flow vs gross_income_taxable
 	netClaims := findClaimsBySemanticType(claims, "net_cash_flow")
 	taxableClaims := findClaimsBySemanticType(claims, "gross_income_taxable")
 	for _, net := range netClaims {
 		for _, tax := range taxableClaims {
-			rels = append(rels, Relationship{
+			rels = append(rels, evidence.Relationship{
 				ID:        fmt.Sprintf("rel_incomp_%s_%s", net.ID, tax.ID),
-				Type:      RelIncomparable,
+				Type:      evidence.RelIncomparable,
 				ClaimA:    net.ID,
 				ClaimB:    tax.ID,
 				Semantics: "net_cash_flow vs gross_taxable_income",
@@ -144,7 +139,7 @@ func (n *Normalizer) BuildRelationships(claims []Claim) []Relationship {
 	return rels
 }
 
-func extractSources(doc Document, result *nutrient.ExtractionResult, field string, pdfW, pdfH float64) []Source {
+func extractSources(doc evidence.Document, result *nutrient.ExtractionResult, field string, pdfW, pdfH float64) []evidence.Source {
 	citation, ok := result.Metadata[field]
 	if !ok {
 		return nil
@@ -159,10 +154,10 @@ func extractSources(doc Document, result *nutrient.ExtractionResult, field strin
 	scaleX := pdfW / nutW
 	scaleY := pdfH / nutH
 
-	var sources []Source
+	var sources []evidence.Source
 
 	if citation.Bbox != nil {
-		sources = append(sources, Source{
+		sources = append(sources, evidence.Source{
 			DocumentID: doc.ID,
 			Filename:   doc.Filename,
 			Page:       citation.PageNumber,
@@ -173,7 +168,7 @@ func extractSources(doc Document, result *nutrient.ExtractionResult, field strin
 	} else {
 		for _, sb := range citation.SourceBboxes {
 			if sb.Bbox != nil {
-				sources = append(sources, Source{
+				sources = append(sources, evidence.Source{
 					DocumentID: doc.ID,
 					Filename:   doc.Filename,
 					Page:       sb.PageNumber,
@@ -209,7 +204,7 @@ func toFloat64(v any) float64 {
 	return 0
 }
 
-func findClaimByID(claims []Claim, id string) *Claim {
+func findClaimByID(claims []evidence.Claim, id string) *evidence.Claim {
 	for i := range claims {
 		if claims[i].ID == id {
 			return &claims[i]
@@ -218,7 +213,7 @@ func findClaimByID(claims []Claim, id string) *Claim {
 	return nil
 }
 
-func findClaimBySemanticType(claims []Claim, stype string) *Claim {
+func findClaimBySemanticType(claims []evidence.Claim, stype string) *evidence.Claim {
 	for i := range claims {
 		if claims[i].SemanticType == stype {
 			return &claims[i]
@@ -227,8 +222,8 @@ func findClaimBySemanticType(claims []Claim, stype string) *Claim {
 	return nil
 }
 
-func findClaimsBySemanticType(claims []Claim, stype string) []Claim {
-	var result []Claim
+func findClaimsBySemanticType(claims []evidence.Claim, stype string) []evidence.Claim {
+	var result []evidence.Claim
 	for _, c := range claims {
 		if c.SemanticType == stype {
 			result = append(result, c)

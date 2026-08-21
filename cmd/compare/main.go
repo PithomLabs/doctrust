@@ -10,6 +10,7 @@ import (
 	"github.com/doctrust/doctrust/internal/eval"
 	"github.com/doctrust/doctrust/internal/evidence"
 	"github.com/doctrust/doctrust/internal/opa"
+	"github.com/doctrust/doctrust/internal/service"
 )
 
 type comparisonResult struct {
@@ -72,24 +73,11 @@ func main() {
 	}
 	runner := eval.NewRunner(checks)
 
-	// Build Facts from snapshot — preserve all sources
-	f := make(eval.Facts)
-	for _, c := range snapshot.Claims {
-		for _, src := range c.Sources {
-			sourceSpan := ""
-			if len(src.BBox) >= 4 {
-				sourceSpan = fmt.Sprintf("page=%d;bbox=[%.1f,%.1f,%.1f,%.1f]", src.Page, src.BBox[0], src.BBox[1], src.BBox[2], src.BBox[3])
-			} else if src.Page > 0 {
-				sourceSpan = fmt.Sprintf("page=%d", src.Page)
-			}
-			f[c.SemanticType] = append(f[c.SemanticType], eval.Fact{
-				Value:      c.Value,
-				SourceDoc:  src.Filename,
-				FieldName:  src.FieldName,
-				SourceSpan: sourceSpan,
-				Confidence: src.Confidence,
-			})
-		}
+	// Build Facts from snapshot using canonical builder
+	f, err := service.BuildFactsFromSnapshot(&snapshot)
+	if err != nil {
+		fmt.Printf("BuildFactsFromSnapshot error: %v\n", err)
+		os.Exit(1)
 	}
 
 	decision, err := runner.Evaluate(context.Background(), rs, f)

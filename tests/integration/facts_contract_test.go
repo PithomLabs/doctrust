@@ -11,6 +11,7 @@ import (
 	"github.com/doctrust/doctrust/internal/evidence"
 	"github.com/doctrust/doctrust/internal/eval"
 	"github.com/doctrust/doctrust/internal/facts"
+	"github.com/doctrust/doctrust/internal/ingest"
 	"github.com/doctrust/doctrust/internal/nutrient"
 )
 
@@ -39,7 +40,7 @@ func TestFactsContract_NutrientToChecks(t *testing.T) {
 	extractionKey := os.Getenv("NUTRIENT_DWS_EXTRACTION_API_KEY")
 	client := nutrient.NewClient(extractionKey, "")
 
-	normalizer := facts.NewNormalizer()
+	normalizer := ingest.NewNormalizer()
 
 	var allFacts facts.Facts = make(facts.Facts)
 	var allEvidence []facts.EvidenceWithSource

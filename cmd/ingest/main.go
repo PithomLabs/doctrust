@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/doctrust/doctrust/internal/evidence"
+	"github.com/doctrust/doctrust/internal/ingest"
 	"github.com/doctrust/doctrust/internal/nutrient"
 )
 
@@ -86,7 +87,7 @@ func main() {
 	}
 
 	client := nutrient.NewClient(extractionKey, "")
-	normalizer := evidence.NewNormalizer()
+	normalizer := ingest.NewEvidenceNormalizer()
 
 	// Find PDF files
 	entries, err := os.ReadDir(dir)
@@ -105,7 +106,7 @@ func main() {
 		}
 
 		path := filepath.Join(dir, entry.Name())
-		docType := evidence.ClassifyDocument(entry.Name())
+		docType := ingest.ClassifyDocument(entry.Name())
 
 		fileBytes, err := os.ReadFile(path)
 		if err != nil {
@@ -158,7 +159,7 @@ func main() {
 
 		// Parse PDF MediaBox for bbox coordinate transform
 		pdfW, pdfH := 612.0, 792.0 // Letter defaults
-		if mw, mh, err := evidence.ParseMediaBox(fileBytes); err == nil && mw > 0 && mh > 0 {
+		if mw, mh, err := ingest.ParseMediaBox(fileBytes); err == nil && mw > 0 && mh > 0 {
 			pdfW, pdfH = mw, mh
 		}
 

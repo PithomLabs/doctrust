@@ -1,7 +1,7 @@
 package eval
 
 import (
-	"github.com/doctrust/doctrust/internal/evidence"
+	"github.com/doctrust/doctrust/internal/types"
 	"github.com/doctrust/doctrust/internal/facts"
 )
 
@@ -39,7 +39,7 @@ type Result struct {
 	Status   Status                `json:"status" yaml:"status"`
 	Severity Severity              `json:"severity" yaml:"severity"`
 	Reason   string                `json:"reason" yaml:"reason"`
-	Evidence []evidence.EvidenceRef `json:"evidence" yaml:"evidence"`
+	Evidence []types.EvidenceRef `json:"evidence" yaml:"evidence"`
 	Metrics  map[string]any        `json:"metrics,omitempty" yaml:"metrics,omitempty"`
 }
 

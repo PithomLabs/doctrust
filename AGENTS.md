@@ -2,7 +2,7 @@
 
 This file is the authoritative reference for AI agents working on this codebase. It defines locked architecture rules, canonical types, and forbidden patterns.
 
-**Phase status:** Phases 1-4 frozen. See `plans3/` for development history.
+**Phase status:** Phases 1-4 frozen. Phase 1 corrective refactor complete (service layer migration, artifact hash fix, lifecycle invariant). See `plans4/` for development history.
 
 ---
 
@@ -22,6 +22,10 @@ These are frozen. Do not modify, reinterpret, or "improve" them.
 10. **Evidence comparison uses set semantics**: not list order. `evidenceEqual()` compares Field+SourceDoc+SourceSpan+Confidence.
 11. **Audit artifact carries Ruleset provenance**: `Artifact.SetRuleset()` must be called in both `handleFinalize` and `handleAudit`. The ruleset hash is computed from the same promoted Ruleset used for evaluation.
 12. **Current coordinate contract**: evidence bboxes are treated as viewer-compatible top-left PDF-point coordinates; no transform is currently applied. Any change to the extraction/viewer coordinate contract requires an explicit verification and regression test.
+13. **Provider boundary**: `internal/service` and `cmd/doctrust-mcp` must NEVER import `internal/nutrient`, `internal/extraction`, or `internal/opa`. Enforced by `make lint-imports`.
+14. **Handler lifecycle**: Only `handleEvaluate` may call `LoadCase` + `Evaluate`. Later handlers (`handleReview`, `handleDisposition`, `handleFinalize`, `handleAudit`) must return an error if no case is loaded. They operate on the pinned case state.
+15. **Artifact hash integrity**: `Finalize()` and `Hash()` use `hashable()` canonical form that excludes `Manifest.ArtifactHash` to break the self-referential cycle. `Finalize().ArtifactHash == Hash()` is guaranteed.
+16. **SourceDoc canonicalization**: `Fact.SourceDoc` uses the canonical document TYPE from `snapshot.Documents[].Type` (e.g., "paystub", "w2"), NOT the filename. Enforced by `service.BuildFactsFromSnapshot`.
 
 ---
 
@@ -43,11 +47,67 @@ Final decision (PASS | REVIEW | FAIL)
 
 ## Key Types
 
-### facts/model.go
+### internal/types (leaf package — zero internal imports)
+
+```go
+// DocumentType is the canonical document type identifier.
+type DocumentType string
+
+const (
+    DocTypePaystub  DocumentType = "paystub"
+    DocTypeW2       DocumentType = "w2"
+    DocType1040     DocumentType = "form_1040"
+    DocTypeBankStmt DocumentType = "bank_statement"
+    DocTypeUnknown  DocumentType = "unknown"
+)
+
+// EvidenceRef is the pointer from a check result back to source evidence.
+type EvidenceRef struct {
+    Field      string  `json:"field" yaml:"field"`
+    SourceDoc  string  `json:"source_doc" yaml:"source_doc"`
+    SourceSpan string  `json:"source_span" yaml:"source_span"`
+    Confidence float64 `json:"confidence" yaml:"confidence"`
+}
+```
+
+### internal/evidence (model types only — no Nutrient/extraction deps)
+
+```go
+// Re-exported from types for convenience.
+type DocumentType = types.DocumentType
+type EvidenceRef = types.EvidenceRef
+
+// EvidenceGraph is the complete evidence snapshot for a case.
+type EvidenceGraph struct {
+    CaseID        string         `json:"case_id"`
+    Documents     []Document     `json:"documents"`
+    Claims        []Claim        `json:"claims"`
+    Relationships []Relationship `json:"relationships"`
+    CreatedAt     time.Time      `json:"created_at"`
+}
+
+type Document struct {
+    ID       string       `json:"id"`
+    Filename string       `json:"filename"`
+    Hash     string       `json:"hash"`
+    Type     DocumentType `json:"type"`
+}
+
+type Claim struct {
+    ID           string      `json:"id"`
+    Field        string      `json:"field"`
+    SemanticType string      `json:"semantic_type"`
+    Value        any         `json:"value"`
+    ValueType    string      `json:"value_type"`
+    Sources      []Source    `json:"sources"`
+    Status       ClaimStatus `json:"status"`
+}
+```
+
+### internal/facts (Facts/Fact types)
 
 ```go
 // Facts maps semantic type → all observations of that type.
-// Multiple documents can produce observations of the same semantic type.
 type Facts map[string][]Fact
 
 // Fact is a single canonical observation with full provenance.
@@ -57,19 +117,6 @@ type Fact struct {
     FieldName  string    // field name within the document
     SourceSpan string    // page + bounding box (e.g. "page=1;bbox=[508,274,50,8]")
     Confidence float64   // [0..1]
-}
-```
-
-### evidence/model.go
-
-```go
-// EvidenceRef is a pointer from a check result back to source evidence.
-// Used in Result.Evidence and in expected scenario assertions.
-type EvidenceRef struct {
-    Field      string  `json:"field" yaml:"field"`
-    SourceDoc  string  `json:"source_doc" yaml:"source_doc"`
-    SourceSpan string  `json:"source_span" yaml:"source_span"`
-    Confidence float64 `json:"confidence" yaml:"confidence"`
 }
 ```
 
@@ -87,7 +134,7 @@ type Result struct {
     Status   Status     // PASS | REVIEW | FAIL
     Severity Severity   // INFO | WARNING | BLOCKING
     Reason   string
-    Evidence []evidence.EvidenceRef
+    Evidence []types.EvidenceRef
     Metrics  map[string]any
 }
 
@@ -151,7 +198,31 @@ type Artifact struct {
 }
 
 func (a *Artifact) SetRuleset(id, version, hash string)
-func (a *Artifact) Finalize()  // computes Manifest.ArtifactHash
+func (a *Artifact) Finalize()  // computes Manifest.ArtifactHash via hashable()
+```
+
+### internal/service (application boundary)
+
+```go
+// DocTrustService is the application boundary.
+// It depends ONLY on: eval, facts, evidence (model), audit, review, types.
+// It must NOT import: nutrient, extraction, opa.
+type DocTrustService struct { /* unexported */ }
+
+func NewDocTrustService(domain, rulesetsDir string) (*DocTrustService, error)
+func (s *DocTrustService) LoadCase(ctx context.Context, snapshotPath string) error
+func (s *DocTrustService) Evaluate(ctx context.Context) (*eval.Decision, error)
+func (s *DocTrustService) GetDecision() *eval.Decision
+func (s *DocTrustService) GetFinding(index int) (*eval.Result, error)
+func (s *DocTrustService) GetEvidence(findingIndex int) ([]types.EvidenceRef, error)
+func (s *DocTrustService) GetRuleset() RulesetInfo
+func (s *DocTrustService) GetReviews() ([]*review.HumanReview, error)
+func (s *DocTrustService) RequestHumanReview(findingIndex int, action review.FindingAction, note string) (string, error)
+func (s *DocTrustService) BuildArtifact() (*audit.Artifact, error)
+
+// BuildFactsFromSnapshot converts an EvidenceGraph into canonical Facts.
+// SourceDoc is resolved from snapshot.Documents[].Type (canonical), NOT filename.
+func BuildFactsFromSnapshot(snapshot *evidence.EvidenceGraph) (facts.Facts, error)
 ```
 
 ---
@@ -174,9 +245,9 @@ func (c *MyCheck) Evaluate(facts Facts, params map[string]any) Result {
 ```
 
 3. Register in ALL of these files:
-   - `cmd/server/main.go` (line ~76)
    - `cmd/regression/main.go` (line ~71)
    - `cmd/compare/main.go` (if exists)
+   - `cmd/server/main.go` uses `eval.DefaultRegistry().All()` (no explicit registration needed)
 4. Add scenario YAML files in `scenarios/<domain>/`
 5. Add test in `internal/eval/eval_test.go`
 
@@ -329,6 +400,10 @@ These are violations. Do not do them.
 - ❌ Accepting `finding_index` without validating against current findings
 - ❌ Omitting `Artifact.SetRuleset()` in finalize or audit handlers
 - ❌ Using `PSPDFKit.Annotations.RectangleAnnotation` (use `NutrientViewer.Annotations.RectangleAnnotation`)
+- ❌ Importing `internal/nutrient`, `internal/extraction`, or `internal/opa` from `internal/service` or `cmd/doctrust-mcp`
+- ❌ Calling `LoadCase` or `Evaluate` from any handler other than `handleEvaluate`
+- ❌ Using `SourceDoc: src.Filename` in Fact construction (must use canonical document type)
+- ❌ Using `Hash()` after `Finalize()` without the `hashable()` canonical form
 
 ---
 
@@ -353,6 +428,15 @@ bin/registry
 
 # Dry-run promotion
 bin/promote --domain income_verification --dry-run
+
+# Provider boundary check
+make lint-imports
+
+# Service tests
+go test ./internal/service/... -v
+
+# Artifact hash integrity
+go test ./internal/audit/... -v -run TestArtifact
 ```
 
 ---
@@ -368,6 +452,7 @@ go test ./cmd/server/... -v -run TestHandleRuleset
 go test ./cmd/server/... -v -run TestHandleEvaluate
 go test ./cmd/server/... -v -run TestHandleFinalize
 go test ./cmd/server/... -v -run TestHandleReview
+go test ./cmd/server/... -v -run TestLifecycle_NoReEvaluation
 ```
 
 **Test coverage:**
@@ -382,7 +467,8 @@ go test ./cmd/server/... -v -run TestHandleReview
 | `TestHandleReview_OutOfRangeFindingIndex` | Out-of-range index rejected (400) |
 | `TestHandleReview_ValidFindingIndex` | Valid review stored correctly |
 | `TestParseSourceSpan` | SourceSpan parsing correctness |
-| `TestBuildFactsFromSnapshot` | Facts construction from snapshot |
+| `TestBuildFactsFromSnapshot_UsesCanonicalBuilder` | HTTP path uses service builder |
+| `TestLifecycle_NoReEvaluation` | Later handlers never re-load or re-evaluate |
 
 ---
 

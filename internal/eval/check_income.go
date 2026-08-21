@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/evidence"
+	"github.com/doctrust/doctrust/internal/types"
 )
 
 // getFloat64 safely extracts float64 from Facts (first value in slice)
@@ -150,7 +150,7 @@ func (c *GrossIncomeConsistencyCheck) Evaluate(facts Facts, params map[string]an
 			Status:   StatusReview,
 			Severity: SeverityWarning,
 			Reason:   "Missing required income fields",
-			Evidence: []evidence.EvidenceRef{},
+			Evidence: []types.EvidenceRef{},
 		}
 	}
 
@@ -163,9 +163,9 @@ func (c *GrossIncomeConsistencyCheck) Evaluate(facts Facts, params map[string]an
 	}
 
 	// Build evidence with SourceSpan and Confidence from Fact.
-	evidenceList := []evidence.EvidenceRef{}
+	evidenceList := []types.EvidenceRef{}
 	for _, fact := range facts["gross_income_projected"] {
-		evidenceList = append(evidenceList, evidence.EvidenceRef{
+		evidenceList = append(evidenceList, types.EvidenceRef{
 			Field:      "gross_income_projected",
 			SourceDoc:  fact.SourceDoc,
 			SourceSpan: fact.SourceSpan,
@@ -173,7 +173,7 @@ func (c *GrossIncomeConsistencyCheck) Evaluate(facts Facts, params map[string]an
 		})
 	}
 	for _, fact := range facts["gross_income_taxable"] {
-		evidenceList = append(evidenceList, evidence.EvidenceRef{
+		evidenceList = append(evidenceList, types.EvidenceRef{
 			Field:      "gross_income_taxable",
 			SourceDoc:  fact.SourceDoc,
 			SourceSpan: fact.SourceSpan,
@@ -185,7 +185,7 @@ func (c *GrossIncomeConsistencyCheck) Evaluate(facts Facts, params map[string]an
 	if bonusVal, ok := getFloat64(facts, bonusField); ok && bonusVal > 0 {
 		if variance > tolerance {
 			for _, fact := range facts[bonusField] {
-				evidenceList = append(evidenceList, evidence.EvidenceRef{
+				evidenceList = append(evidenceList, types.EvidenceRef{
 					Field:      bonusField,
 					SourceDoc:  fact.SourceDoc,
 					SourceSpan: fact.SourceSpan,
@@ -284,7 +284,7 @@ func (c *RequiredDocumentsCheck) Evaluate(facts Facts, params map[string]any) Re
 			Status:   StatusFail,
 			Severity: SeverityBlocking,
 			Reason:   "Missing required documents: " + strings.Join(missing, ", "),
-			Evidence: []evidence.EvidenceRef{},
+			Evidence: []types.EvidenceRef{},
 			Metrics: map[string]any{
 				"missing": missing,
 			},
@@ -296,7 +296,7 @@ func (c *RequiredDocumentsCheck) Evaluate(facts Facts, params map[string]any) Re
 		Status:   StatusPass,
 		Severity: SeverityInfo,
 		Reason:   "All required documents present",
-		Evidence: []evidence.EvidenceRef{},
+		Evidence: []types.EvidenceRef{},
 	}
 }
 
@@ -315,9 +315,9 @@ func (c *NetVsGrossIncomparabilityCheck) Evaluate(facts Facts, params map[string
 	_, hasNet := getFloat64(facts, "net_cash_flow")
 	_, hasGross := getFloat64(facts, "gross_income_taxable")
 
-	evList := []evidence.EvidenceRef{}
+	evList := []types.EvidenceRef{}
 	for _, fact := range facts["net_cash_flow"] {
-		evList = append(evList, evidence.EvidenceRef{
+		evList = append(evList, types.EvidenceRef{
 			Field:      "net_cash_flow",
 			SourceDoc:  fact.SourceDoc,
 			SourceSpan: fact.SourceSpan,
@@ -325,7 +325,7 @@ func (c *NetVsGrossIncomparabilityCheck) Evaluate(facts Facts, params map[string
 		})
 	}
 	for _, fact := range facts["gross_income_taxable"] {
-		evList = append(evList, evidence.EvidenceRef{
+		evList = append(evList, types.EvidenceRef{
 			Field:      "gross_income_taxable",
 			SourceDoc:  fact.SourceDoc,
 			SourceSpan: fact.SourceSpan,

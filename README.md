@@ -13,6 +13,10 @@ Nutrient DWS extracts evidence from source PDFs
         ↓
 Evidence snapshot (frozen, SHA-256 bound to documents)
         ↓
+DocTrustService (provider-agnostic, no Nutrient deps)
+        ↓
+BuildFactsFromSnapshot (canonical SourceDoc, BBox pass-through)
+        ↓
 Eval engine evaluates against promoted Ruleset (deterministic, no LLM)
         ↓
 Machine Decision = PASS / REVIEW / FAIL  (structured, reproducible, auditable)
@@ -29,12 +33,15 @@ Signed PDF report (cryptographic binding)
 ### Core Invariants
 
 - **Ingestion-agnostic**: no Nutrient dependency inside `internal/eval`
+- **Provider boundary**: `internal/service` has zero Nutrient/extraction/opa dependencies
 - **Zero LLM at runtime**: deterministic checks only
 - **No hot reload**: promoted Ruleset is immutable at startup
 - **No fallback to reference policy**: promoted Ruleset is authoritative
 - **No silent failures**: unknown documents → explicit state, never silently dropped
 - **Map key owns semantic identity**: `Facts[string]Fact` where string is the semantic type
 - **EvidenceRef is output/projection**: `facts.Fact` is the canonical observation
+- **Single evaluation entry point**: Only `/api/evaluate` loads and evaluates; later handlers operate on pinned case
+- **SourceDoc canonicalization**: `Fact.SourceDoc` uses document type from snapshot, NOT filename
 
 ---
 
@@ -74,9 +81,12 @@ doctrust/
     ingest/                     # Nutrient extraction pipeline
     compile-policy/             # POLICY.md → Rego compiler (Phase 3)
   internal/
+    types/                      # Leaf shared contracts (DocumentType, EvidenceRef)
     eval/                       # Core eval engine (locked architecture)
-    facts/                      # Canonical facts model
-    evidence/                   # EvidenceRef, EvidenceGraph
+    facts/                      # Canonical facts model (Facts, Fact)
+    evidence/                   # Evidence model (EvidenceGraph, Document, Claim)
+    service/                    # Application boundary (DocTrustService)
+    ingest/                     # Nutrient-specific ingestion (classifier, normalizer)
     opa/                        # OPA SDK wrapper (reference)
     compiler/                   # LLM policy compiler (Phase 3)
     nutrient/                   # Nutrient DWS client
@@ -98,7 +108,7 @@ doctrust/
   policies/                     # Rego policies (reference/migration)
   web/                          # Server UI templates
   scripts/                      # PDF generation
-  plans3/                       # Development history (plans, adversarial reviews)
+  plans4/                       # Development history (plans, adversarial reviews)
 ```
 
 ---
@@ -270,8 +280,11 @@ go vet ./...                                            # must be clean
 go test ./...                                           # all tests pass
 go test -race ./...                                     # race detector
 go test ./internal/eval/... -v -run TestRunAllScenarios # 14/14 strict
+go test ./internal/service/... -v                       # service layer tests
+go test ./internal/audit/... -v -run TestArtifact       # artifact hash integrity
 bin/regression --domain income_verification             # baseline = 0 changed
 bin/registry                                            # shows all versions
+make lint-imports                                       # provider boundary check
 ```
 
 ---
@@ -280,11 +293,15 @@ bin/registry                                            # shows all versions
 
 | Property | Protection |
 |----------|------------|
-| Ruleset identity in audit | `Artifact.SetRuleset()` called in `handleFinalize` and `handleAudit` |
-| Bbox grounding | `buildFactsFromSnapshot` → `parseSourceSpan` → UI, no transform |
-| finding_index validation | `handleReview` validates index against `decision.Results` |
-| Server trust tests | 9 tests in `cmd/server/main_test.go` |
-| Coordinate contract | Documented in `buildFactsFromSnapshot` and `navigateToFinding` |
+| Ruleset identity in audit | `Artifact.SetRuleset()` called in `handleFinalize` and `handleAudit` via `svc.BuildArtifact()` |
+| Bbox grounding | `BuildFactsFromSnapshot` passes through viewer-scaled bboxes with no transform |
+| finding_index validation | `svc.RequestHumanReview()` validates index against pinned `decision.Results` |
+| Server trust tests | 10 tests in `cmd/server/main_test.go` |
+| Coordinate contract | Documented in `BuildFactsFromSnapshot` and `navigateToFinding` |
+| Provider boundary | `make lint-imports` verifies `internal/service` has no nutrient/extraction/opa deps |
+| Handler lifecycle | `TestLifecycle_NoReEvaluation` proves later handlers never re-load or re-evaluate |
+| Artifact hash integrity | `TestArtifact_Finalize_HashIntegrity` proves `Finalize().ArtifactHash == Hash()` |
+| SourceDoc canonicalization | `TestBuildFactsFromSnapshot_SourceDocCanonical` proves production filenames produce canonical types |
 
 ---
 
@@ -293,6 +310,7 @@ bin/registry                                            # shows all versions
 | Phase | Status | Description |
 |-------|--------|-------------|
 | Phase 1 | Frozen | Nutrient integration, evidence normalization, 14/14 strict scenarios |
+| Phase 1 (corrective) | Frozen | Service layer migration, artifact hash fix, lifecycle invariant, provider boundary |
 | Phase 2 | Frozen | Regression CLI, promote CLI, registry CLI, Ruleset params default |
 | Phase 3 | Frozen | Authoring pipeline: AST transform, promotion, 5 trust gates, symlink containment |
 | Phase 4 | Frozen | Enriched evaluation UI, audit artifact with ruleset provenance, bbox grounding, server trust tests |

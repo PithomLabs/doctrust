@@ -1,11 +1,12 @@
-package facts
+package ingest
 
 import (
 	"fmt"
 
-	"github.com/doctrust/doctrust/internal/evidence"
 	"github.com/doctrust/doctrust/internal/extraction"
+	"github.com/doctrust/doctrust/internal/facts"
 	"github.com/doctrust/doctrust/internal/nutrient"
+	"github.com/doctrust/doctrust/internal/types"
 )
 
 // Normalizer converts Nutrient extraction output into Facts.
@@ -20,69 +21,38 @@ func NewNormalizer() *Normalizer {
 	}
 }
 
-// NormalizedOutput is the result of normalization - Facts + Evidence for the eval engine
-type NormalizedOutput struct {
-	Facts     Facts
-	Evidence  []EvidenceWithSource
-	Documents []Document
-}
-
-// EvidenceWithSource pairs an EvidenceRef with its source document info
-type EvidenceWithSource struct {
-	evidence.EvidenceRef
-	DocumentID string
-	Filename   string
-	Page       int
-}
-
-// Document represents an ingested document (for Facts output)
-type Document struct {
-	ID       string `json:"id"`
-	Filename string `json:"filename"`
-	Hash     string `json:"hash"`
-	Type     string `json:"type"` // string for JSON compatibility
-}
-
 // Normalize takes a Nutrient extraction result and produces Facts + Evidence for the eval engine
-func (n *Normalizer) Normalize(docID, filename string, docHash string, docType evidence.DocumentType, result *nutrient.ExtractFieldsResponse) (NormalizedOutput, error) {
+func (n *Normalizer) Normalize(docID, filename string, docHash string, docType types.DocumentType, result *nutrient.ExtractFieldsResponse) (facts.NormalizedOutput, error) {
 	config, ok := n.configs[docType]
 	if !ok {
-		return NormalizedOutput{}, fmt.Errorf("no extraction config for document type %s", docType)
+		return facts.NormalizedOutput{}, fmt.Errorf("no extraction config for document type %s", docType)
 	}
 
-	var evidenceWithSource []EvidenceWithSource
-	f := make(Facts)
+	var evidenceWithSource []facts.EvidenceWithSource
+	f := make(facts.Facts)
 
-	// Convert each extracted field to a Fact
 	for field, norm := range config.FieldMapping {
 		value, ok := result.Output.Data[field]
 		if !ok {
 			continue
 		}
-
-		// Get citation metadata
 		citation, ok := result.Output.Metadata[field]
 		if !ok {
 			continue
 		}
-
-		// Parse the value
 		parsedValue := extraction.ParseCurrencyValue(value)
 
-		// Create Fact with full observation identity
-		fact := Fact{
+		fact := facts.Fact{
 			Value:      parsedValue,
 			SourceDoc:  filename,
 			FieldName:  field,
 			Confidence: citation.Confidence,
 		}
 
-		// Add bbox info to SourceSpan if available
 		if citation.Bbox != nil {
 			fact.SourceSpan = fmt.Sprintf("page=%d;bbox=[%.1f,%.1f,%.1f,%.1f]",
 				citation.PageNumber, citation.Bbox.X, citation.Bbox.Y, citation.Bbox.Width, citation.Bbox.Height)
 		} else if len(citation.SourceBboxes) > 0 {
-			// Use first source bbox if available
 			sb := citation.SourceBboxes[0]
 			if sb.Bbox != nil {
 				fact.SourceSpan = fmt.Sprintf("page=%d;bbox=[%.1f,%.1f,%.1f,%.1f]",
@@ -90,13 +60,11 @@ func (n *Normalizer) Normalize(docID, filename string, docHash string, docType e
 			}
 		}
 
-		// Append to slice (preserves multiple observations per semantic type)
 		f[norm.SemanticType] = append(f[norm.SemanticType], fact)
 
-		// Create evidence with source info
 		if citation.Bbox != nil {
-			evidenceWithSource = append(evidenceWithSource, EvidenceWithSource{
-				EvidenceRef: evidence.EvidenceRef{
+			evidenceWithSource = append(evidenceWithSource, facts.EvidenceWithSource{
+				EvidenceRef: types.EvidenceRef{
 					Field:      norm.SemanticType,
 					SourceSpan: fmt.Sprintf("page=%d;bbox=[%.1f,%.1f,%.1f,%.1f]", citation.PageNumber, citation.Bbox.X, citation.Bbox.Y, citation.Bbox.Width, citation.Bbox.Height),
 					Confidence: citation.Confidence,
@@ -108,8 +76,8 @@ func (n *Normalizer) Normalize(docID, filename string, docHash string, docType e
 		} else if len(citation.SourceBboxes) > 0 {
 			for _, sb := range citation.SourceBboxes {
 				if sb.Bbox != nil {
-					evidenceWithSource = append(evidenceWithSource, EvidenceWithSource{
-						EvidenceRef: evidence.EvidenceRef{
+					evidenceWithSource = append(evidenceWithSource, facts.EvidenceWithSource{
+						EvidenceRef: types.EvidenceRef{
 							Field:      norm.SemanticType,
 							SourceSpan: fmt.Sprintf("page=%d;bbox=[%.1f,%.1f,%.1f,%.1f]", sb.PageNumber, sb.Bbox.X, sb.Bbox.Y, sb.Bbox.Width, sb.Bbox.Height),
 							Confidence: citation.Confidence,
@@ -123,10 +91,10 @@ func (n *Normalizer) Normalize(docID, filename string, docHash string, docType e
 		}
 	}
 
-	return NormalizedOutput{
+	return facts.NormalizedOutput{
 		Facts:    f,
 		Evidence: evidenceWithSource,
-		Documents: []Document{
+		Documents: []facts.Document{
 			{ID: docID, Filename: filename, Hash: "", Type: string(docType)},
 		},
 	}, nil

@@ -117,6 +117,68 @@ func (a *Artifact) SetRuleset(id, version, hash string) {
 	a.RulesetHash = hash
 }
 
+// hashableArtifact is a canonical representation for hashing.
+// Manifest.ArtifactHash is excluded to break the self-referential cycle.
+type hashableArtifact struct {
+	Version          string              `json:"version"`
+	PolicyID         string              `json:"policy_id"`
+	PolicyHash       string              `json:"policy_hash"`
+	RulesetID        string              `json:"ruleset_id"`
+	RulesetVersion   string              `json:"ruleset_version"`
+	RulesetHash      string              `json:"ruleset_hash"`
+	Decisions        []Decision          `json:"decisions"`
+	Documents        []DocumentRecord    `json:"documents"`
+	HumanReviews     []HumanReviewRecord `json:"human_reviews,omitempty"`
+	FinalDisposition string              `json:"final_disposition,omitempty"`
+	CreatedAt        time.Time           `json:"created_at"`
+	CompletedAt      *time.Time          `json:"completed_at,omitempty"`
+	Signatures       []Signature         `json:"signatures,omitempty"`
+	Manifest         struct {
+		DocCount      int `json:"doc_count"`
+		DecisionCount int `json:"decision_count"`
+		ReviewCount   int `json:"review_count"`
+	} `json:"manifest"`
+}
+
+func (a *Artifact) hashable() hashableArtifact {
+	reviewCount := 0
+	for _, d := range a.Decisions {
+		if d.State == "REVIEW" {
+			reviewCount++
+		}
+	}
+	return hashableArtifact{
+		Version:          a.Version,
+		PolicyID:         a.PolicyID,
+		PolicyHash:       a.PolicyHash,
+		RulesetID:        a.RulesetID,
+		RulesetVersion:   a.RulesetVersion,
+		RulesetHash:      a.RulesetHash,
+		Decisions:        a.Decisions,
+		Documents:        a.Documents,
+		HumanReviews:     a.HumanReviews,
+		FinalDisposition: a.FinalDisposition,
+		CreatedAt:        a.CreatedAt,
+		CompletedAt:      a.CompletedAt,
+		Signatures:       a.Signatures,
+		Manifest: struct {
+			DocCount      int `json:"doc_count"`
+			DecisionCount int `json:"decision_count"`
+			ReviewCount   int `json:"review_count"`
+		}{
+			DocCount:      len(a.Documents),
+			DecisionCount: len(a.Decisions),
+			ReviewCount:   reviewCount,
+		},
+	}
+}
+
+func (a *Artifact) computeHash() string {
+	data, _ := json.Marshal(a.hashable())
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:])
+}
+
 func (a *Artifact) Finalize() {
 	now := time.Now().UTC()
 	a.CompletedAt = &now
@@ -128,14 +190,11 @@ func (a *Artifact) Finalize() {
 		}
 	}
 
-	data, _ := json.Marshal(a)
-	hash := sha256.Sum256(data)
-
 	a.Manifest = Manifest{
 		DocCount:      len(a.Documents),
 		DecisionCount: len(a.Decisions),
 		ReviewCount:   reviewCount,
-		ArtifactHash:  hex.EncodeToString(hash[:]),
+		ArtifactHash:  a.computeHash(),
 	}
 }
 
@@ -144,9 +203,7 @@ func (a *Artifact) ToJSON() ([]byte, error) {
 }
 
 func (a *Artifact) Hash() string {
-	data, _ := json.Marshal(a)
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:])
+	return a.computeHash()
 }
 
 func (a *Artifact) Summary() string {

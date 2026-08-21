@@ -88,3 +88,22 @@ clean:
 # Setup: download dependencies
 setup:
 	go mod tidy
+
+# Authoritative provider-boundary check
+# internal/service and cmd/doctrust-mcp must NOT depend on
+# internal/nutrient, internal/extraction, or internal/opa
+lint-imports:
+	@echo "Checking service boundary..."
+	@if go list -deps ./internal/service 2>/dev/null | grep -qE "internal/(nutrient|extraction|opa)"; then \
+		echo "FAIL: internal/service depends on forbidden package"; \
+		go list -deps ./internal/service | grep -E "internal/(nutrient|extraction|opa)"; \
+		exit 1; \
+	fi
+	@if [ -d cmd/doctrust-mcp ]; then \
+		echo "Checking MCP boundary..."; \
+		if go list -deps ./cmd/doctrust-mcp 2>/dev/null | grep -qE "internal/(nutrient|extraction|opa)"; then \
+			echo "FAIL: cmd/doctrust-mcp depends on forbidden package"; \
+			exit 1; \
+		fi; \
+	fi
+	@echo "PASS: provider boundary clean"

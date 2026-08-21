@@ -1,6 +1,6 @@
 package eval
 
-import "github.com/doctrust/doctrust/internal/evidence"
+import "github.com/doctrust/doctrust/internal/types"
 
 type DecisionAggregator struct{}
 
@@ -38,7 +38,7 @@ func (a *DecisionAggregator) Decide(results []Result, rs Ruleset) Decision {
 	for i, r := range results {
 		copied[i] = r
 		if len(r.Evidence) > 0 {
-			copied[i].Evidence = make([]evidence.EvidenceRef, len(r.Evidence))
+			copied[i].Evidence = make([]types.EvidenceRef, len(r.Evidence))
 			copy(copied[i].Evidence, r.Evidence)
 		}
 	}

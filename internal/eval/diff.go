@@ -3,7 +3,7 @@ package eval
 import (
 	"math"
 
-	"github.com/doctrust/doctrust/internal/evidence"
+	"github.com/doctrust/doctrust/internal/types"
 )
 
 type ScenarioDiff struct {
@@ -73,7 +73,7 @@ type evidenceKey struct {
 // Identity is by Field. When expected specifies SourceDoc, actual must have at least
 // one matching entry. When expected specifies SourceSpan/Confidence, actual must have
 // at least one entry matching those provenance fields.
-func evidenceEqual(a, b []evidence.EvidenceRef) bool {
+func evidenceEqual(a, b []types.EvidenceRef) bool {
 	// Build unique field set from actual
 	type actualEntry struct {
 		SourceDoc  string

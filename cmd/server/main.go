@@ -14,20 +14,17 @@ import (
 	"github.com/doctrust/doctrust/internal/audit"
 	"github.com/doctrust/doctrust/internal/eval"
 	"github.com/doctrust/doctrust/internal/evidence"
-	"github.com/doctrust/doctrust/internal/facts"
 	"github.com/doctrust/doctrust/internal/nutrient"
 	"github.com/doctrust/doctrust/internal/review"
+	"github.com/doctrust/doctrust/internal/service"
 )
 
 var (
 	snapshotDir    string
-	policyHash     string
 	nutrientKey    string
 	processorKey   string
-	store          *review.ReviewStore
 	nutrientClient *nutrient.Client
-	evalRunner     *eval.Runner
-	loadedRuleset  eval.Ruleset
+	svc            *service.DocTrustService
 )
 
 func main() {
@@ -37,7 +34,6 @@ func main() {
 	flag.Parse()
 
 	snapshotDir = *snapDir
-	store = review.NewReviewStore()
 
 	nutrientKey = os.Getenv("NUTRIENT_EXTRACTION_KEY")
 	processorKey = os.Getenv("NUTRIENT_PROCESSOR_KEY")
@@ -51,27 +47,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Load ruleset via registry (promoted version) — no fallback
-	registry := eval.NewRegistry("rulesets")
-	rs, err := registry.LoadPromoted(*domain)
+	// Initialize service layer (loads promoted ruleset, creates runner)
+	var err error
+	svc, err = service.NewDocTrustService(*domain, "rulesets")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: no promoted ruleset found for domain %s: %v\n", *domain, err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	log.Printf("Loaded promoted ruleset: %s v%s", rs.ID, rs.Version)
-	loadedRuleset = rs
-
-	// Build check registry
-	evalRunner = eval.NewRunner(eval.DefaultRegistry().All())
-
-	// Load snapshot for policy hash
-	snapshotPath := filepath.Join(snapshotDir, "evidence_snapshot.json")
-	snapshotData, err := os.ReadFile(snapshotPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading snapshot: %v\n", err)
-		os.Exit(1)
-	}
-	policyHash = fmt.Sprintf("%x", sha256.Sum256(snapshotData))
+	info := svc.GetRuleset()
+	log.Printf("Loaded promoted ruleset: %s v%s", info.ID, info.Version)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleIndex)
@@ -89,7 +73,7 @@ func main() {
 	mux.HandleFunc("/static/", handleStatic)
 
 	fmt.Printf("DocTrust server listening on :%s\n", *port)
-	fmt.Printf("Ruleset: %s v%s\n", loadedRuleset.ID, loadedRuleset.Version)
+	fmt.Printf("Ruleset: %s v%s\n", info.ID, info.Version)
 	fmt.Printf("Snapshot: %s\n", snapshotDir)
 	log.Fatal(http.ListenAndServe(":"+*port, mux))
 }
@@ -124,48 +108,6 @@ func handleSnapshot(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data)
-}
-
-// buildFactsFromSnapshot converts an EvidenceGraph into canonical Facts.
-// Preserves all source observations for each claim (not just the first).
-//
-// Coordinate contract: bbox values in the evidence snapshot are already in
-// viewer-compatible coordinates (top-left origin, PDF points). They are
-// passed directly to NutrientViewer.Geometry.Rect with no transform.
-func buildFactsFromSnapshot(snapshot *evidence.EvidenceGraph) facts.Facts {
-	f := make(facts.Facts)
-	for _, c := range snapshot.Claims {
-		for _, src := range c.Sources {
-			sourceSpan := ""
-			if len(src.BBox) >= 4 {
-				sourceSpan = fmt.Sprintf("page=%d;bbox=[%.1f,%.1f,%.1f,%.1f]", src.Page, src.BBox[0], src.BBox[1], src.BBox[2], src.BBox[3])
-			} else if src.Page > 0 {
-				sourceSpan = fmt.Sprintf("page=%d", src.Page)
-			}
-			f[c.SemanticType] = append(f[c.SemanticType], facts.Fact{
-				Value:      c.Value,
-				SourceDoc:  src.Filename,
-				FieldName:  src.FieldName,
-				SourceSpan: sourceSpan,
-				Confidence: src.Confidence,
-			})
-		}
-	}
-	return f
-}
-
-// loadSnapshot reads and unmarshals the evidence snapshot.
-func loadSnapshot() (*evidence.EvidenceGraph, error) {
-	snapshotPath := filepath.Join(snapshotDir, "evidence_snapshot.json")
-	snapshotJSON, err := os.ReadFile(snapshotPath)
-	if err != nil {
-		return nil, fmt.Errorf("snapshot not found: %w", err)
-	}
-	var snapshot evidence.EvidenceGraph
-	if err := json.Unmarshal(snapshotJSON, &snapshot); err != nil {
-		return nil, fmt.Errorf("invalid snapshot: %w", err)
-	}
-	return &snapshot, nil
 }
 
 // Local HTTP DTOs — these are presentation models, not engine types.
@@ -252,16 +194,23 @@ func maxConfidence(refs []evidence.EvidenceRef) float64 {
 	return max
 }
 
+// ensureEvaluated verifies that a case has been loaded and evaluated.
+// It must NOT load or evaluate — only handleEvaluate may do that.
+func ensureEvaluated() error {
+	if svc.GetDecision() == nil {
+		return fmt.Errorf("no case loaded — call /api/evaluate first")
+	}
+	return nil
+}
+
 func handleEvaluate(w http.ResponseWriter, r *http.Request) {
-	snapshot, err := loadSnapshot()
-	if err != nil {
-		http.Error(w, err.Error(), 404)
+	snapshotPath := filepath.Join(snapshotDir, "evidence_snapshot.json")
+	if err := svc.LoadCase(r.Context(), snapshotPath); err != nil {
+		http.Error(w, fmt.Sprintf("load case: %v", err), 500)
 		return
 	}
 
-	f := buildFactsFromSnapshot(snapshot)
-
-	decision, err := evalRunner.Evaluate(r.Context(), loadedRuleset, f)
+	decision, err := svc.Evaluate(r.Context())
 	if err != nil {
 		http.Error(w, fmt.Sprintf("evaluation error: %v", err), 500)
 		return
@@ -334,27 +283,12 @@ func handleReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	snapshot, err := loadSnapshot()
+	// Operate on already-evaluated case — NO reload, NO re-evaluate
+	_, err := svc.RequestHumanReview(req.FindingIndex, req.Action, req.Note)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), 400)
 		return
 	}
-	f := buildFactsFromSnapshot(snapshot)
-	decision, err := evalRunner.Evaluate(r.Context(), loadedRuleset, f)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("evaluate: %v", err), 500)
-		return
-	}
-	if req.FindingIndex < 0 || req.FindingIndex >= len(decision.Results) {
-		http.Error(w, "invalid finding_index", 400)
-		return
-	}
-
-	store.AddReview(&review.HumanReview{
-		FindingIndex: req.FindingIndex,
-		Action:       req.Action,
-		Note:         req.Note,
-	})
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
@@ -365,7 +299,11 @@ func handleReview(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleReviews(w http.ResponseWriter, r *http.Request) {
-	reviews := store.GetAll()
+	reviews, err := svc.GetReviews()
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(reviews); err != nil {
 		log.Printf("json encode error: %v", err)
@@ -375,8 +313,11 @@ func handleReviews(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRuleset(w http.ResponseWriter, r *http.Request) {
+	info := svc.GetRuleset()
+
 	// Compute ruleset hash
-	hash, err := loadedRuleset.ComputeHash()
+	ruleset := &eval.Ruleset{ID: info.ID, Version: info.Version, Checks: info.Checks}
+	hash, err := ruleset.ComputeHash()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("compute hash: %v", err), 500)
 		return
@@ -389,7 +330,7 @@ func handleRuleset(w http.ResponseWriter, r *http.Request) {
 		Description string `json:"description"`
 	}
 	var checks []checkInfo
-	for _, ref := range loadedRuleset.Checks {
+	for _, ref := range info.Checks {
 		desc := checkDescriptions[ref.ID]
 		checks = append(checks, checkInfo{
 			ID:          ref.ID,
@@ -400,11 +341,11 @@ func handleRuleset(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]any{
-		"id":             loadedRuleset.ID,
-		"version":        loadedRuleset.Version,
+		"id":             info.ID,
+		"version":        info.Version,
 		"hash":           hash,
 		"checks":         checks,
-		"checks_count":   len(loadedRuleset.Checks),
+		"checks_count":   len(info.Checks),
 	}); err != nil {
 		log.Printf("json encode error: %v", err)
 		http.Error(w, "internal error", 500)
@@ -413,8 +354,10 @@ func handleRuleset(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRegression(w http.ResponseWriter, r *http.Request) {
+	info := svc.GetRuleset()
+
 	// Load all scenarios for this domain
-	scenariosDir := filepath.Join("scenarios", loadedRuleset.ID)
+	scenariosDir := filepath.Join("scenarios", info.ID)
 	scenarios, err := eval.LoadAllScenariosFromDir(scenariosDir)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("load scenarios: %v", err), 500)
@@ -455,12 +398,13 @@ func handleRegression(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Compute ruleset hash for version binding
-	hash, _ := loadedRuleset.ComputeHash()
+	ruleset := &eval.Ruleset{ID: info.ID, Version: info.Version, Checks: info.Checks}
+	hash, _ := ruleset.ComputeHash()
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]any{
-		"ruleset_id":      loadedRuleset.ID,
-		"ruleset_version": loadedRuleset.Version,
+		"ruleset_id":      info.ID,
+		"ruleset_version": info.Version,
 		"ruleset_hash":    hash,
 		"total":           len(results),
 		"passed":          passed,
@@ -474,43 +418,25 @@ func handleRegression(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDisposition(w http.ResponseWriter, r *http.Request) {
-	snapshot, err := loadSnapshot()
-	if err != nil {
-		http.Error(w, err.Error(), 404)
+	// Ensure case is loaded and evaluated
+	if err := ensureEvaluated(); err != nil {
+		http.Error(w, fmt.Sprintf("evaluate: %v", err), 500)
 		return
 	}
 
-	f := buildFactsFromSnapshot(snapshot)
-
-	decision, err := evalRunner.Evaluate(r.Context(), loadedRuleset, f)
+	// Operate on already-evaluated case
+	artifact, err := svc.BuildArtifact()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("evaluation error: %v", err), 500)
+		http.Error(w, fmt.Sprintf("build artifact: %v", err), 500)
 		return
 	}
-
-	var findings []review.Finding
-	for _, res := range decision.Results {
-		findings = append(findings, review.Finding{
-			Rule:     res.CheckID,
-			Severity: string(res.Severity),
-			ClaimA:   res.CheckID,
-			ClaimB:   "",
-		})
-	}
-
-	reviewsMap := make(map[int]*review.HumanReview)
-	for _, r := range store.GetAll() {
-		reviewsMap[r.FindingIndex] = r
-	}
-
-	final := review.ComputeFinalDisposition(string(decision.Status), findings, reviewsMap)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"eval_decision":     string(decision.Status),
-		"final_disposition": final,
-		"reviews_count":     store.Count(),
-		"findings_count":    len(findings),
+		"eval_decision":     string(svc.GetDecision().Status),
+		"final_disposition": artifact.FinalDisposition,
+		"reviews_count":     len(artifact.HumanReviews),
+		"findings_count":    len(artifact.Decisions),
 	}); err != nil {
 		log.Printf("json encode error: %v", err)
 		http.Error(w, "internal error", 500)
@@ -524,63 +450,20 @@ func handleFinalize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	snapshot, err := loadSnapshot()
-	if err != nil {
-		http.Error(w, err.Error(), 404)
+	// Ensure case is loaded and evaluated
+	if err := ensureEvaluated(); err != nil {
+		http.Error(w, fmt.Sprintf("evaluate: %v", err), 500)
 		return
 	}
 
-	f := buildFactsFromSnapshot(snapshot)
-
-	decision, err := evalRunner.Evaluate(r.Context(), loadedRuleset, f)
+	// Build artifact from already-evaluated case
+	artifact, err := svc.BuildArtifact()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("evaluation error: %v", err), 500)
+		http.Error(w, fmt.Sprintf("build artifact: %v", err), 500)
 		return
 	}
 
-	artifact := audit.NewArtifact("income_verification", policyHash)
-	rHash, _ := loadedRuleset.ComputeHash()
-	artifact.SetRuleset(loadedRuleset.ID, loadedRuleset.Version, rHash)
-
-	for _, doc := range snapshot.Documents {
-		artifact.AddDocument(audit.DocumentRecord{
-			FileName: doc.Filename,
-			DocType:  string(doc.Type),
-			Hash:     doc.Hash,
-		})
-	}
-
-	var findings []review.Finding
-	for _, res := range decision.Results {
-		findings = append(findings, review.Finding{
-			Rule:     res.CheckID,
-			Severity: string(res.Severity),
-			ClaimA:   res.CheckID,
-			ClaimB:   "",
-		})
-	}
-
-	artifact.AddDecision(audit.Decision{
-		CaseID:   "income_verification",
-		State:    string(decision.Status),
-		Findings: convertFindings(decision.Results),
-	})
-
-	reviewsMap := make(map[int]*review.HumanReview)
-	for _, r := range store.GetAll() {
-		reviewsMap[r.FindingIndex] = r
-		artifact.AddHumanReview(audit.HumanReviewRecord{
-			FindingIndex: r.FindingIndex,
-			Action:       string(r.Action),
-			Note:         r.Note,
-			ResolvedAt:   r.ResolvedAt,
-		})
-	}
-
-	final := review.ComputeFinalDisposition(string(decision.Status), findings, reviewsMap)
-	artifact.SetFinalDisposition(final)
-	artifact.Finalize()
-
+	// HTTP-specific: generate PDF report
 	pdfBytes, err := audit.GenerateAuditReport(artifact)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("generate report: %v", err), 500)
@@ -597,7 +480,7 @@ func handleFinalize(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":            "finalized",
-		"final_disposition": final,
+		"final_disposition": artifact.FinalDisposition,
 		"artifact_hash":     artifact.Manifest.ArtifactHash,
 		"report_path":       reportPath,
 		"report_size":       len(pdfBytes),
@@ -610,70 +493,26 @@ func handleFinalize(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleAudit(w http.ResponseWriter, r *http.Request) {
-	snapshot, err := loadSnapshot()
-	if err != nil {
-		http.Error(w, err.Error(), 404)
+	// Ensure case is loaded and evaluated
+	if err := ensureEvaluated(); err != nil {
+		http.Error(w, fmt.Sprintf("evaluate: %v", err), 500)
 		return
 	}
 
-	f := buildFactsFromSnapshot(snapshot)
-
-	decision, err := evalRunner.Evaluate(r.Context(), loadedRuleset, f)
+	// Build artifact from already-evaluated case
+	artifact, err := svc.BuildArtifact()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("evaluation error: %v", err), 500)
+		http.Error(w, fmt.Sprintf("build artifact: %v", err), 500)
 		return
 	}
-
-	artifact := audit.NewArtifact("income_verification", policyHash)
-	rHash, _ := loadedRuleset.ComputeHash()
-	artifact.SetRuleset(loadedRuleset.ID, loadedRuleset.Version, rHash)
-
-	for _, doc := range snapshot.Documents {
-		artifact.AddDocument(audit.DocumentRecord{
-			FileName: doc.Filename,
-			DocType:  string(doc.Type),
-			Hash:     doc.Hash,
-		})
-	}
-
-	var findings []review.Finding
-	for _, res := range decision.Results {
-		findings = append(findings, review.Finding{
-			Rule:     res.CheckID,
-			Severity: string(res.Severity),
-			ClaimA:   res.CheckID,
-			ClaimB:   "",
-		})
-	}
-
-	artifact.AddDecision(audit.Decision{
-		CaseID:   "income_verification",
-		State:    string(decision.Status),
-		Findings: convertFindings(decision.Results),
-	})
-
-	reviewsMap := make(map[int]*review.HumanReview)
-	for _, r := range store.GetAll() {
-		reviewsMap[r.FindingIndex] = r
-		artifact.AddHumanReview(audit.HumanReviewRecord{
-			FindingIndex: r.FindingIndex,
-			Action:       string(r.Action),
-			Note:         r.Note,
-			ResolvedAt:   r.ResolvedAt,
-		})
-	}
-
-	final := review.ComputeFinalDisposition(string(decision.Status), findings, reviewsMap)
-	artifact.SetFinalDisposition(final)
-	artifact.Finalize()
 
 	artifactJSON, _ := artifact.ToJSON()
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"artifact":          json.RawMessage(artifactJSON),
 		"artifact_hash":     artifact.Manifest.ArtifactHash,
-		"final_disposition": final,
-		"reviews_count":     store.Count(),
+		"final_disposition": artifact.FinalDisposition,
+		"reviews_count":     len(artifact.HumanReviews),
 	}); err != nil {
 		log.Printf("json encode error: %v", err)
 		http.Error(w, "internal error", 500)
@@ -730,19 +569,6 @@ func handleSign(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", 500)
 		return
 	}
-}
-
-func convertFindings(in []eval.Result) []audit.Finding {
-	out := make([]audit.Finding, len(in))
-	for i, f := range in {
-		out[i] = audit.Finding{
-			Rule:     f.CheckID,
-			Severity: string(f.Severity),
-			ClaimA:   f.CheckID,
-			ClaimB:   "",
-		}
-	}
-	return out
 }
 
 func handleDocument(w http.ResponseWriter, r *http.Request) {

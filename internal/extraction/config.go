@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/nutrient"
+	"github.com/doctrust/doctrust/internal/types"
 )
 
 // ExtractionConfig defines how to normalize a specific document type.
@@ -22,9 +22,9 @@ type FieldNormalization struct {
 }
 
 // IncomeVerificationConfigs returns the extraction configs for income verification.
-func IncomeVerificationConfigs() map[nutrient.DocumentType]ExtractionConfig {
-	return map[nutrient.DocumentType]ExtractionConfig{
-		nutrient.DocTypePaystub: {
+func IncomeVerificationConfigs() map[types.DocumentType]ExtractionConfig {
+	return map[types.DocumentType]ExtractionConfig{
+		types.DocTypePaystub: {
 			DocumentType: "paystub",
 			FieldMapping: map[string]FieldNormalization{
 				"annualized_gross_ytd": {
@@ -43,7 +43,7 @@ func IncomeVerificationConfigs() map[nutrient.DocumentType]ExtractionConfig {
 				},
 			},
 		},
-		nutrient.DocTypeW2: {
+		types.DocTypeW2: {
 			DocumentType: "w2",
 			FieldMapping: map[string]FieldNormalization{
 				"wages_tips_other_compensation": {
@@ -52,7 +52,7 @@ func IncomeVerificationConfigs() map[nutrient.DocumentType]ExtractionConfig {
 				},
 			},
 		},
-		nutrient.DocType1040: {
+		types.DocType1040: {
 			DocumentType: "form_1040",
 			FieldMapping: map[string]FieldNormalization{
 				"line1z_wages": {
@@ -61,7 +61,7 @@ func IncomeVerificationConfigs() map[nutrient.DocumentType]ExtractionConfig {
 				},
 			},
 		},
-		nutrient.DocTypeBankStmt: {
+		types.DocTypeBankStmt: {
 			DocumentType: "bank_statement",
 			FieldMapping: map[string]FieldNormalization{
 				"total_deposits": {

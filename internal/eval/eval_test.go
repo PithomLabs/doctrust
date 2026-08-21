@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/doctrust/doctrust/internal/evidence"
+	"github.com/doctrust/doctrust/internal/types"
 )
 
 func TestAggregator(t *testing.T) {
@@ -143,7 +143,7 @@ func TestDiffResults(t *testing.T) {
 
 	// Evidence change
 	after = Result{Status: StatusPass, Severity: SeverityInfo, Reason: "ok",
-		Evidence: []evidence.EvidenceRef{{Field: "new_field"}}}
+		Evidence: []types.EvidenceRef{{Field: "new_field"}}}
 	diff = DiffResults(after, before)
 	if diff == nil || !diff.EvidenceChanged {
 		t.Errorf("different evidence should have diff with EvidenceChanged=true")
@@ -190,7 +190,7 @@ func TestRunner(t *testing.T) {
 			Status:   StatusReview,
 			Severity: SeverityWarning,
 			Reason:   "Variance exceeds tolerance; documented bonus may explain",
-			Evidence: []evidence.EvidenceRef{
+			Evidence: []types.EvidenceRef{
 				{Field: "gross_income_projected", SourceSpan: "page=1", Confidence: 0.95},
 				{Field: "gross_income_taxable", SourceSpan: "page=1", Confidence: 0.95},
 				{Field: "bonus_compensation", SourceSpan: "page=1", Confidence: 0.95},

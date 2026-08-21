@@ -5,18 +5,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/doctrust/doctrust/internal/nutrient"
+	"github.com/doctrust/doctrust/internal/types"
 )
 
-// Re-export nutrient types for convenience.
-type DocumentType = nutrient.DocumentType
+// Re-export shared leaf types.
+type DocumentType = types.DocumentType
+type EvidenceRef = types.EvidenceRef
 
 const (
-	DocTypePaystub  = nutrient.DocTypePaystub
-	DocTypeW2       = nutrient.DocTypeW2
-	DocType1040     = nutrient.DocType1040
-	DocTypeBankStmt = nutrient.DocTypeBankStmt
-	DocTypeUnknown  = nutrient.DocTypeUnknown
+	DocTypePaystub  = types.DocTypePaystub
+	DocTypeW2       = types.DocTypeW2
+	DocType1040     = types.DocType1040
+	DocTypeBankStmt = types.DocTypeBankStmt
+	DocTypeUnknown  = types.DocTypeUnknown
 )
 
 // Document represents an ingested document.
@@ -86,15 +87,6 @@ type EvidenceGraph struct {
 	Claims        []Claim        `json:"claims"`
 	Relationships []Relationship `json:"relationships"`
 	CreatedAt     time.Time      `json:"created_at"`
-}
-
-// EvidenceRef is the pointer from a check result back to source evidence.
-// Owned by internal/evidence.
-type EvidenceRef struct {
-	Field      string  `json:"field" yaml:"field"`
-	SourceDoc  string  `json:"source_doc" yaml:"source_doc"`
-	SourceSpan string  `json:"source_span" yaml:"source_span"`
-	Confidence float64 `json:"confidence" yaml:"confidence"`
 }
 
 // ComputeHash computes a SHA-256 hash of the document content.

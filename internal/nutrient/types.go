@@ -1,6 +1,10 @@
 package nutrient
 
-import "time"
+import (
+	"time"
+
+	"github.com/doctrust/doctrust/internal/types"
+)
 
 // ExtractFieldsRequest is the instructions JSON sent with extract_fields.
 type ExtractFieldsRequest struct {
@@ -115,14 +119,14 @@ type DataExtractionCredits struct {
 }
 
 // DocumentType represents the classified type of a document.
-type DocumentType string
+type DocumentType = types.DocumentType
 
 const (
-	DocTypePaystub  DocumentType = "paystub"
-	DocTypeW2       DocumentType = "w2"
-	DocType1040     DocumentType = "form_1040"
-	DocTypeBankStmt DocumentType = "bank_statement"
-	DocTypeUnknown  DocumentType = "unknown"
+	DocTypePaystub  = types.DocTypePaystub
+	DocTypeW2       = types.DocTypeW2
+	DocType1040     = types.DocType1040
+	DocTypeBankStmt = types.DocTypeBankStmt
+	DocTypeUnknown  = types.DocTypeUnknown
 )
 
 // ExtractionResult holds the full extraction output for a single document.

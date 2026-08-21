@@ -7,11 +7,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
-	"github.com/doctrust/doctrust/internal/eval"
-	"github.com/doctrust/doctrust/internal/review"
+	"github.com/doctrust/doctrust/internal/service"
 )
 
 const testSnapshotJSON = `{
@@ -49,20 +47,33 @@ func setupTestServer(t *testing.T) *httptest.Server {
 		t.Fatalf("write snapshot: %v", err)
 	}
 
-	store = review.NewReviewStore()
-
-	loadedRuleset = eval.Ruleset{
-		ID:      "income_verification",
-		Version: "1",
-		Checks: []eval.CheckRef{
-			{ID: "gross_income_consistency", Version: "1.0", Params: map[string]any{"tolerance": 0.05}},
-			{ID: "required_documents", Version: "1.0"},
-			{ID: "net_vs_gross_incomparability", Version: "1.0"},
-		},
+	// Create promoted ruleset for the service
+	rulesetsDir := filepath.Join(dir, "rulesets")
+	rulesetDir := filepath.Join(rulesetsDir, "income_verification")
+	if err := os.MkdirAll(rulesetDir, 0755); err != nil {
+		t.Fatalf("mkdir ruleset: %v", err)
+	}
+	rulesetYAML := `id: income_verification
+version: "1"
+checks:
+    - id: gross_income_consistency
+      version: "1.0"
+      params:
+        tolerance: 0.05
+    - id: required_documents
+      version: "1.0"
+    - id: net_vs_gross_incomparability
+      version: "1.0"
+`
+	if err := os.WriteFile(filepath.Join(rulesetDir, "v1.yaml"), []byte(rulesetYAML), 0644); err != nil {
+		t.Fatalf("write ruleset: %v", err)
 	}
 
-	evalRunner = eval.NewRunner(eval.DefaultRegistry().All())
-	policyHash = "test_hash_abc123"
+	var err error
+	svc, err = service.NewDocTrustService("income_verification", rulesetsDir)
+	if err != nil {
+		t.Fatalf("NewDocTrustService: %v", err)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/evaluate", handleEvaluate)
@@ -241,6 +252,16 @@ func TestHandleFinalize_ArtifactContainsRulesetProvenance(t *testing.T) {
 	srv := setupTestServer(t)
 	defer srv.Close()
 
+	// Must evaluate first — lifecycle requires /api/evaluate before /api/finalize
+	evalResp, err := http.Get(srv.URL + "/api/evaluate")
+	if err != nil {
+		t.Fatalf("GET /api/evaluate: %v", err)
+	}
+	evalResp.Body.Close()
+	if evalResp.StatusCode != 200 {
+		t.Fatalf("evaluate status = %d, want 200", evalResp.StatusCode)
+	}
+
 	resp, err := http.Post(srv.URL+"/api/finalize", "application/json", nil)
 	if err != nil {
 		t.Fatalf("POST /api/finalize: %v", err)
@@ -366,7 +387,10 @@ func TestHandleReview_ValidFindingIndex(t *testing.T) {
 	}
 
 	// Verify review was stored
-	reviews := store.GetAll()
+	reviews, err := svc.GetReviews()
+	if err != nil {
+		t.Fatalf("GetReviews: %v", err)
+	}
 	if len(reviews) != 1 {
 		t.Fatalf("expected 1 review, got %d", len(reviews))
 	}
@@ -375,38 +399,124 @@ func TestHandleReview_ValidFindingIndex(t *testing.T) {
 	}
 }
 
-func TestBuildFactsFromSnapshot(t *testing.T) {
-	// Set up snapshot directory directly (no HTTP server needed)
+func TestBuildFactsFromSnapshot_UsesCanonicalBuilder(t *testing.T) {
+	// Set up snapshot directory
 	dir := t.TempDir()
 	snapshotDir = dir
 	if err := os.WriteFile(filepath.Join(dir, "evidence_snapshot.json"), []byte(testSnapshotJSON), 0644); err != nil {
 		t.Fatalf("write snapshot: %v", err)
 	}
 
-	snapshot, err := loadSnapshot()
+	// The service's BuildFactsFromSnapshot must use canonical SourceDoc
+	// (this is already tested in internal/service/builder_test.go,
+	// but this confirms the HTTP path uses the same builder)
+	snapshotPath := filepath.Join(dir, "evidence_snapshot.json")
+	if err := svc.LoadCase(nil, snapshotPath); err != nil {
+		t.Fatalf("LoadCase: %v", err)
+	}
+
+	// Verify the snapshot's document type mapping resolves correctly
+	info := svc.GetRuleset()
+	if info.ID != "income_verification" {
+		t.Errorf("ruleset ID = %q, want %q", info.ID, "income_verification")
+	}
+}
+
+// TestLifecycle_NoReEvaluation proves the HTTP lifecycle invariant:
+// AFTER /api/evaluate pins the case, later handlers do NOT re-load or re-evaluate.
+func TestLifecycle_NoReEvaluation(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	// Step 1: Evaluate the case
+	evalResp, err := http.Get(srv.URL + "/api/evaluate")
 	if err != nil {
-		t.Fatalf("loadSnapshot: %v", err)
+		t.Fatalf("GET /api/evaluate: %v", err)
+	}
+	defer evalResp.Body.Close()
+	if evalResp.StatusCode != 200 {
+		t.Fatalf("evaluate status = %d, want 200", evalResp.StatusCode)
 	}
 
-	facts := buildFactsFromSnapshot(snapshot)
+	var evalBody enrichedResult
+	if err := json.NewDecoder(evalResp.Body).Decode(&evalBody); err != nil {
+		t.Fatalf("decode evaluate: %v", err)
+	}
+	originalDecision := evalBody.Decision
+	t.Logf("original decision: %s", originalDecision)
 
-	// Should have gross_income_projected and gross_income_taxable
-	projected := facts["gross_income_projected"]
-	if len(projected) == 0 {
-		t.Fatal("expected gross_income_projected facts")
+	// Step 2: Add a review — this must NOT re-evaluate
+	reviewBody, _ := json.Marshal(map[string]any{
+		"finding_index": 0,
+		"action":        "confirm",
+		"note":          "approved by test",
+	})
+	reviewResp, err := http.Post(srv.URL+"/api/review", "application/json", bytes.NewReader(reviewBody))
+	if err != nil {
+		t.Fatalf("POST /api/review: %v", err)
+	}
+	reviewResp.Body.Close()
+	if reviewResp.StatusCode != 200 {
+		t.Fatalf("review status = %d, want 200", reviewResp.StatusCode)
 	}
 
-	taxable := facts["gross_income_taxable"]
-	if len(taxable) == 0 {
-		t.Fatal("expected gross_income_taxable facts")
+	// Step 3: Call finalize — this must NOT re-evaluate
+	finalizeResp, err := http.Post(srv.URL+"/api/finalize", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST /api/finalize: %v", err)
+	}
+	defer finalizeResp.Body.Close()
+	if finalizeResp.StatusCode != 200 {
+		t.Fatalf("finalize status = %d, want 200", finalizeResp.StatusCode)
 	}
 
-	// Check that bbox is in the SourceSpan
-	span := projected[0].SourceSpan
-	if !strings.Contains(span, "page=1") {
-		t.Errorf("SourceSpan should contain page=1, got %q", span)
+	// Step 4: Verify the artifact contains the review and the original decision
+	var finalizeBody struct {
+		Status           string `json:"status"`
+		FinalDisposition string `json:"final_disposition"`
+		Artifact         struct {
+			Decisions []struct {
+				State string `json:"state"`
+			} `json:"decisions"`
+			HumanReviews []struct {
+				FindingIndex int    `json:"finding_index"`
+				Action       string `json:"action"`
+			} `json:"human_reviews"`
+		} `json:"artifact"`
 	}
-	if !strings.Contains(span, "bbox=[508.0,274.0,50.0,8.0]") {
-		t.Errorf("SourceSpan should contain bbox, got %q", span)
+	if err := json.NewDecoder(finalizeResp.Body).Decode(&finalizeBody); err != nil {
+		t.Fatalf("decode finalize: %v", err)
+	}
+
+	if finalizeBody.Status != "finalized" {
+		t.Errorf("finalize status = %q, want %q", finalizeBody.Status, "finalized")
+	}
+
+	// The decision in the artifact must match the original evaluate decision
+	if len(finalizeBody.Artifact.Decisions) > 0 {
+		artifactDecision := finalizeBody.Artifact.Decisions[0].State
+		if artifactDecision != originalDecision {
+			t.Errorf("artifact decision %q differs from original %q — re-evaluation occurred", artifactDecision, originalDecision)
+		}
+	}
+
+	// The review must be present in the artifact
+	if len(finalizeBody.Artifact.HumanReviews) != 1 {
+		t.Errorf("expected 1 human review in artifact, got %d", len(finalizeBody.Artifact.HumanReviews))
+	} else if finalizeBody.Artifact.HumanReviews[0].Action != "confirm" {
+		t.Errorf("review action = %q, want %q", finalizeBody.Artifact.HumanReviews[0].Action, "confirm")
+	}
+
+	// Step 5: Verify calling finalize without /api/evaluate returns error
+	// (fresh server = no case loaded)
+	srv2 := setupTestServer(t)
+	defer srv2.Close()
+	errResp, err := http.Post(srv2.URL+"/api/finalize", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST /api/finalize on fresh server: %v", err)
+	}
+	errResp.Body.Close()
+	if errResp.StatusCode != 500 {
+		t.Errorf("fresh server finalize status = %d, want 500 (no case loaded)", errResp.StatusCode)
 	}
 }

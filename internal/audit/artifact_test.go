@@ -45,3 +45,46 @@ func TestSetRulesetJSON(t *testing.T) {
 		}
 	}
 }
+
+func TestArtifact_Finalize_HashIntegrity(t *testing.T) {
+	a := NewArtifact("income_verification", "policy123")
+	a.SetRuleset("income_verification", "2", "rulesethash456")
+	a.AddDocument(DocumentRecord{FileName: "paystub.pdf", DocType: "paystub", Hash: "abc"})
+	a.AddDecision(Decision{
+		CaseID: "case1",
+		State:  "PASS",
+		Findings: []Finding{
+			{Rule: "gross_income_consistency", Severity: "INFO"},
+		},
+	})
+
+	a.Finalize()
+
+	// ArtifactHash from manifest must equal Hash()
+	if a.Manifest.ArtifactHash != a.Hash() {
+		t.Errorf("ArtifactHash mismatch: manifest=%s, Hash()=%s", a.Manifest.ArtifactHash, a.Hash())
+	}
+
+	// Hash must be stable across calls
+	h1 := a.Hash()
+	h2 := a.Hash()
+	if h1 != h2 {
+		t.Errorf("Hash() not stable: %s != %s", h1, h2)
+	}
+
+	// Hash must change if artifact changes
+	a2 := NewArtifact("income_verification", "policy123")
+	a2.SetRuleset("income_verification", "2", "rulesethash456")
+	a2.AddDocument(DocumentRecord{FileName: "paystub.pdf", DocType: "paystub", Hash: "abc"})
+	a2.AddDecision(Decision{
+		CaseID: "case1",
+		State:  "FAIL",
+		Findings: []Finding{
+			{Rule: "required_documents", Severity: "BLOCKING"},
+		},
+	})
+	a2.Finalize()
+	if a.Hash() == a2.Hash() {
+		t.Error("expected different hash for different artifact content")
+	}
+}
