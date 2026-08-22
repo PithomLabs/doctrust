@@ -1,4 +1,4 @@
-.PHONY: build run test ingest clean setup demo-pdfs check-policy test-policy validate-fixtures eval compile-policy test-compiler server regression promote registry
+.PHONY: build run test ingest clean setup demo-pdfs check-policy test-policy validate-fixtures eval compile-policy test-compiler server regression promote registry mcp
 
 # Build all binaries
 build:
@@ -78,6 +78,10 @@ registry: build
 # Show registry for specific domain
 registry-domain: build
 	bin/registry --domain income_verification
+
+# Build MCP stdio server
+mcp: build
+	go build -o bin/doctrust-mcp ./cmd/doctrust-mcp/
 
 # Clean build artifacts
 clean:
