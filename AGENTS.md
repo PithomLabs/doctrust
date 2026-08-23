@@ -2,7 +2,7 @@
 
 This file is the authoritative reference for AI agents working on this codebase. It defines locked architecture rules, canonical types, and forbidden patterns.
 
-**Phase status:** Phases 1-4 frozen. Phase 1 corrective refactor complete (service layer migration, artifact hash fix, lifecycle invariant). See `plans4/` for development history.
+**Phase status:** Phases 1–4 frozen. **Phase 3 candidate-lifecycle trust funnel FROZEN** (adv_review4 P1-A fixed; real LLM authoring rehearsed end-to-end). See `plans6/` and `plans6/imp.md` for development history, adversarial reviews, and freeze evidence; `plans4/` for earlier phases.
 
 ---
 
@@ -15,7 +15,7 @@ These are frozen. Do not modify, reinterpret, or "improve" them.
 3. **No hardcoded scenario mapping**: scenarios map to checks via `expected.check_id`.
 4. **No reference-policy fallback**: promoted Ruleset is authoritative. `LoadPromoted` failure → error, never silent fallback.
 5. **No hot reload**: promoted Ruleset is immutable at server startup.
-6. **No LLM at runtime**: deterministic checks only. LLM is compile-time only (Phase 3).
+6. **No LLM at runtime**: deterministic checks only. LLM is compile-time only (candidate authoring).
 7. **No Nutrient dependency inside `internal/eval`**: eval engine works with any evidence source.
 8. **Ingestion-agnostic**: the engine does not know or care where evidence comes from.
 9. **No silent failures**: unknown documents → explicit state, never silently dropped.
@@ -26,6 +26,12 @@ These are frozen. Do not modify, reinterpret, or "improve" them.
 14. **Handler lifecycle**: Only `handleEvaluate` may call `LoadCase` + `Evaluate`. Later handlers (`handleReview`, `handleDisposition`, `handleFinalize`, `handleAudit`) must return an error if no case is loaded. They operate on the pinned case state.
 15. **Artifact hash integrity**: `Finalize()` and `Hash()` use `hashable()` canonical form that excludes `Manifest.ArtifactHash` to break the self-referential cycle. `Finalize().ArtifactHash == Hash()` is guaranteed.
 16. **SourceDoc canonicalization**: `Fact.SourceDoc` uses the canonical document TYPE from `snapshot.Documents[].Type` (e.g., "paystub", "w2"), NOT the filename. Enforced by `service.BuildFactsFromSnapshot`.
+17. **Registration symbol comes from AST extraction**: promoted checks register under `extractCheckStructName(snapshot.GoSource)` — the struct name the author actually wrote. Deriving type names from `check_id` is forbidden; the old `toTypeName` helper was deleted for exactly this reason. Natural LLM output owes nothing to any naming convention.
+18. **Generated-check imports are allowlisted**: positive default-deny (`allowedImports` in `import_allowlist.go`; explicit denylist checked first). Candidate Go source may import only: `fmt`, `math`, `sort`, `strconv`, `strings`, `time`, and `internal/{eval,evidence,types,facts}`.
+19. **ONE parameter resolver**: `compiler.ResolveRulesetParams` (Ruleset params win wholesale if present, else scenario fallback). Both staged regression and `cmd/regression` call it. Duplicating the algorithm anywhere breaks the invariant: staged regression PASS ≡ post-promotion regression PASS.
+20. **Promotion gate order is fixed**: ValidateSnapshot → ExecuteCandidateScenarios → StagePromotion → ValidateStagedArtifact → RunStagedRegression → CommitPromotion. Any gate failure must leave the trusted tree (`internal/eval`, `rulesets/`, `scenarios/`) byte-for-byte unchanged.
+21. **Approval is human-gated and content-bound**: approval requires an explicit trimmed `y`/`Y` after full adversarial YAML reprint; any other input cancels with zero state mutation. approval.json binds SHA-256 hashes of all candidate files plus reviewer identity (OS user or `DOCTRUST_REVIEWER`).
+22. **The Gate-4 import-path assertion can never be waived**: if `go list -deps` itself errors, Gate 4 FAILS. The assertion exists to catch module-graph divergence — precisely when it must not be skipped.
 
 ---
 
@@ -229,8 +235,24 @@ func BuildFactsFromSnapshot(snapshot *evidence.EvidenceGraph) (facts.Facts, erro
 
 ## Adding a New Check
 
-1. Create `internal/eval/check_<name>.go`
-2. Implement the `Check` interface:
+Registration is **centralized**: `internal/eval/checks.go::DefaultRegistry()`.
+All consumers (`cmd/regression`, `cmd/server`, `cmd/doctrust-mcp`) call
+`eval.DefaultRegistry().All()` — no caller-side edits are needed.
+
+### Path A: authored through the pipeline (recommended for new logic)
+
+1. `bin/author-check --domain <domain> --intent "<text>"` (or hand-write the
+   candidate files in the layout defined under
+   [Candidate Lifecycle (Trust Funnel)](#candidate-lifecycle-trust-funnel--frozen))
+2. Author the human adversarial scenario, then approve via
+   `bin/review-check <candidate-dir>` with an explicit `y`
+3. `bin/promote-check --candidate <dir> --domain <domain>` — transform,
+   registration insert, Ruleset update, and scenario-corpus merge happen
+   automatically inside the trust funnel
+
+### Path B: hand-written check
+
+1. Create `internal/eval/check_<name>.go` implementing the `Check` interface:
 
 ```go
 type MyCheck struct{}
@@ -244,23 +266,27 @@ func (c *MyCheck) Evaluate(facts Facts, params map[string]any) Result {
 }
 ```
 
-3. Register in ALL of these files:
-   - `cmd/regression/main.go` (line ~71)
-   - `cmd/compare/main.go` (if exists)
-   - `cmd/server/main.go` uses `eval.DefaultRegistry().All()` (no explicit registration needed)
-4. Add scenario YAML files in `scenarios/<domain>/`
-5. Add test in `internal/eval/eval_test.go`
-
-**Check registration pattern** (must be identical in all locations):
+2. Register in `internal/eval/checks.go::DefaultRegistry()`:
 
 ```go
-checks := map[string]eval.Check{
-    "gross_income_consistency":     &eval.GrossIncomeConsistencyCheck{},
-    "required_documents":           &eval.RequiredDocumentsCheck{},
-    "net_vs_gross_incomparability": &eval.NetVsGrossIncomparabilityCheck{},
-    "my_new_check":                 &eval.MyCheck{},  // add here
+func DefaultRegistry() *CheckRegistry {
+    r := NewCheckRegistry()
+    r.Register(&GrossIncomeConsistencyCheck{})
+    r.Register(&RequiredDocumentsCheck{})
+    r.Register(&NetVsGrossIncomparabilityCheck{})
+    r.Register(&MyCheck{}) // add here
+    return r
 }
 ```
+
+3. Add scenario YAML files in `scenarios/<domain>/`
+4. Add tests in `internal/eval/eval_test.go`
+5. Rebuild (`make build`) before verify/runtime — registration compiles into
+   every binary that links DefaultRegistry
+
+Either path ends the same way: the check is registered in DefaultRegistry, its
+scenarios live in the regression corpus, and its params flow from the promoted
+Ruleset through `compiler.ResolveRulesetParams`.
 
 ---
 
@@ -381,6 +407,123 @@ Always use scenario-level params. Ruleset params are ignored.
 
 ---
 
+## Candidate Lifecycle (Trust Funnel) — FROZEN
+
+New check logic reaches the runtime only through this pipeline. All gates are
+fail-closed; any rejection leaves `internal/eval`, `rulesets/`, `scenarios/`,
+and the candidate directory byte-for-byte unchanged.
+
+### State machine
+
+```
+DRAFT → HUMAN_REVIEW → APPROVED → PROMOTED
+                     ↘ REJECTED
+```
+
+States live in `candidates/active/<check_id>/state`. After commit, the candidate
+is archived byte-identically to `candidates/archive/<check_id>/` and marked
+`PROMOTED`; the active directory is removed.
+
+### Candidate directory layout
+
+| File | Written by | Purpose |
+|------|-----------|---------|
+| `check.go` | author-check / human | candidate Go source (`package candidate`, imports eval via canonical path) |
+| `metadata.yaml` | author-check / human | id, version, description, parameters (approved params source of truth) |
+| `scenarios.yaml` | author-check / human | deterministic scenarios incl. expected results |
+| `adversarial.yaml` | **human only** | ≥1 scenario with `origin: human_adversarial` |
+| `state` | pipeline | current lifecycle state |
+| `approval.json` | review-check | SHA-256 hashes of all four artifacts + reviewer identity + timestamp |
+
+### Promotion gates (promote-check main(), fixed order)
+
+| # | Function | Rejects on |
+|---|----------|-----------|
+| 1 | `GetState` | state ≠ APPROVED |
+| 2 | `HasAdversarial` (filesystem) | no human_adversarial scenario |
+| 3 | `SnapshotCandidate` + `VerifyApprovalAgainstSnapshot` | approval identity/content mismatch vs snapshot bytes |
+| 4 | `ValidateSnapshot` | forbidden imports; duplicate Check-ID (registry or any ruleset); build/vet failure; nested go.mod in validation worktree; `go list -deps` assertion error or missing canonical import |
+| 5 | `ExecuteCandidateScenarios` | compile failure, zero scenarios, any Expected≠Actual |
+| 6 | `StagePromotion` | AST transform failure, registration-insert failure, no ruleset for domain |
+| 7 | `ValidateStagedArtifact` | transformed artifact fails to compile inside full module-graph worktree (e.g., symbol collision) |
+| 8 | `RunStagedRegression` | any corpus scenario fails under staged ruleset (production param semantics) |
+| 9 | `CommitPromotion` | I/O failure → automatic rollback restores prior bytes |
+
+Gate 4 early rejections return `(nil, err)` — callers must nil-guard detail printing.
+
+Single-read invariant: everything downstream of Gate 3 consumes snapshot bytes;
+the candidate directory is never re-read after approval verification.
+
+### Key compiler API (internal/compiler)
+
+```go
+func SnapshotCandidate(candidateDir string) (*CandidateSnapshot, error)
+// CandidateSnapshot: Dir, CheckID, Version, GoSource, Metadata, Scenarios,
+//                    Adversarial, Parameters (from metadata.yaml)
+
+func ValidateSnapshot(snapshot *CandidateSnapshot, registry *eval.CheckRegistry,
+    rulesetsDir string) (*CandidateValidationResult, error)
+
+func ExecuteCandidateScenarios(snapshot *CandidateSnapshot) (*CandidateExecutionResult, error)
+
+func StagePromotion(snapshot *CandidateSnapshot, evalDir, domain,
+    rulesetsDir string) (stagingDir string, err error)
+
+func ValidateStagedArtifact(stagingDir, evalDir, repoRoot string) error
+func RunStagedRegression(stagingDir, evalDir, domain, scenariosDir string) error
+func CommitPromotion(stagingDir, evalDir, domain, rulesetsDir, scenariosRoot string,
+    snapshot *CandidateSnapshot) error
+func RollbackPromotion(stagingDir string) error
+
+func ResolveRulesetParams(rs eval.Ruleset, checkID string,
+    fallback map[string]any) map[string]any   // PURE — single source of truth
+
+func applyCheckRef(rs eval.Ruleset, checkID, version string,
+    params map[string]any) eval.Ruleset       // PURE — replace-or-append
+
+func ValidateImports(goSource []byte) ([]ImportViolation, error)
+func InsertCheckRegistration(checksGoPath, typeName string) error
+func extractCheckStructName(goSource string) (string, error)
+```
+
+Semantics that must not drift:
+- **Staging builds the working Ruleset from LoadWorking→LoadPromoted baseline +
+  `applyCheckRef(rs, CheckID, Version, snapshot.Parameters)`** — identical inputs
+  to what CommitPromotion writes; existing CheckRefs and Params survive.
+- **ValidateStagedArtifact** copies the real module tree into a `.doctrust-staged-*`
+  worktree, overlays staged files onto `internal/eval/`, compiles there.
+- **ValidateSnapshot** does the same in a `.doctrust-validate-*` worktree
+  (`copyModuleTree`, nested-go.mod tripwire, candidate compiled as its own package),
+  then asserts the canonical import appears in `go list -deps ./candidate/`.
+- **CommitPromotion** backs up every write target (incl. merged scenario file)
+  and restores them on failure; rollback-of-rollback errors are joined, not swallowed.
+
+### Rebuild requirement
+
+Check registration compiles into `DefaultRegistry()` (`internal/eval/checks.go`).
+After promoting a NEW Go check: `bin/promote` → `make build` → `verify-ruleset`
+→ restart runtime/MCP. Stale binaries fail verify-ruleset closed ("not registered").
+Ruleset-only changes need relaunch only.
+
+### Environment variables
+
+| Variable | Scope | Purpose |
+|----------|-------|---------|
+| `OPENROUTER_API_KEY` | authoring only | required by author-check; fails closed |
+| `OPENROUTER_MODEL` | authoring only | optional model override (default claude-sonnet-4) |
+| `DOCTRUST_REVIEWER` | review only | overrides OS username recorded as reviewer |
+
+### Frozen vs deferred (post-adv_review4)
+
+Frozen: everything above. Deferred P2s — do NOT reopen without explicit instruction:
+legacy `compiler.go` Nutrient linkage (P2-B); OpenRouter env docs were added to
+README (P2-C closed); draft-sentinel ambiguity (P2-D); exact executed-count ==
+expected-count (P2-E); auto manifest cross-check (P2-F); param shadowing cleanup
+(P2-G); first-exported-struct selection (P2-H); orphaned temp worktrees on SIGKILL
+(P2-I); Makefile verify convenience flags (P2-J).
+
+---
+
 ## Forbidden Patterns
 
 These are violations. Do not do them.
@@ -404,6 +547,14 @@ These are violations. Do not do them.
 - ❌ Calling `LoadCase` or `Evaluate` from any handler other than `handleEvaluate`
 - ❌ Using `SourceDoc: src.Filename` in Fact construction (must use canonical document type)
 - ❌ Using `Hash()` after `Finalize()` without the `hashable()` canonical form
+- ❌ Deriving a registration type name from `check_id` (use `extractCheckStructName` on the candidate source)
+- ❌ Duplicating parameter-resolution logic (call `compiler.ResolveRulesetParams`)
+- ❌ Skipping or reordering promotion gates in `promote-check` main()
+- ❌ Writing approval.json without an explicit trimmed `y`/`Y` adversarial confirmation
+- ❌ Mutating any trusted-tree path when a gate fails (assert byte-for-byte equality in tests)
+- ❌ Importing non-allowlisted packages in candidate Go source
+- ❌ Treating a `go list -deps` error as a pass in Gate 4
+- ❌ Running verify-ruleset or the runtime without rebuilding after promoting a new Go check
 
 ---
 
@@ -437,6 +588,12 @@ go test ./internal/service/... -v
 
 # Artifact hash integrity
 go test ./internal/audit/... -v -run TestArtifact
+
+# Candidate lifecycle suites (trust funnel)
+go test ./internal/compiler/...          # gates, staged build/regression, E2E + failure paths
+go test ./cmd/promote-check/...          # duplicate-ID binary regression (P1-A)
+go test ./cmd/review-check/...           # adversarial confirmation subprocess tests
+go test ./cmd/verify-ruleset/...         # version/hash assertion exit codes
 ```
 
 ---

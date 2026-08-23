@@ -1,6 +1,7 @@
 # DocTrust — Universal Document Compliance Engine
 
 Nutrient extraction → frozen evidence → deterministic evaluation → human review → audit artifact.
+AI-authored rules enter through a human-gated trust funnel before reaching the runtime.
 
 **Demo target:** September 4, 2026
 
@@ -9,6 +10,25 @@ Nutrient extraction → frozen evidence → deterministic evaluation → human r
 ## Architecture
 
 ```
+OpenRouter author-check generates a candidate check
+        ↓
+Human authors adversarial scenario + explicit y/N confirmation
+        ↓
+promote-check trust funnel (9 gates, single-read snapshot)
+        ↓
+Staged build + staged regression (production-identical semantics)
+        ↓
+Atomic promotion: Go check + registry + Ruleset draft + scenario corpus
+        ↓
+bin/promote freezes immutable Ruleset version + manifest
+        ↓
+make build → verify-ruleset → restart runtime / MCP
+        ↓
+Hermes/agent evaluate_case against the promoted Ruleset
+
+─────────────────────────────────────────────────────────────
+Runtime flow (per case):
+─────────────────────────────────────────────────────────────
 Nutrient DWS extracts evidence from source PDFs
         ↓
 Evidence snapshot (frozen, SHA-256 bound to documents)
@@ -42,6 +62,10 @@ Signed PDF report (cryptographic binding)
 - **EvidenceRef is output/projection**: `facts.Fact` is the canonical observation
 - **Single evaluation entry point**: Only `/api/evaluate` loads and evaluates; later handlers operate on pinned case
 - **SourceDoc canonicalization**: `Fact.SourceDoc` uses document type from snapshot, NOT filename
+- **Import allowlist**: generated check source may import only allowlisted packages (positive default-deny)
+- **AST-name registration**: promoted checks register under the struct name the author actually wrote — no naming convention is imposed
+- **Staged ≡ production**: one parameter resolver (`compiler.ResolveRulesetParams`) feeds both staged regression and production regression
+- **Trusted-tree immutability**: any gate failure leaves eval/rulesets/scenarios byte-for-byte unchanged
 
 ---
 
@@ -64,6 +88,24 @@ make promote
 make registry
 ```
 
+### Author a new check through the trust funnel
+
+```bash
+bin/author-check --domain income_verification --intent "check that base salary is positive"
+# → candidates/active/<check_id>/  (LLM-generated check + scenarios)
+
+bin/review-check candidates/active/<check_id>
+# author the adversarial scenario, then answer [a] Approve with explicit y
+
+bin/promote-check --candidate candidates/active/<check_id> --domain income_verification
+# 9 gates: approval binding, import allowlist, module-graph build/vet,
+# deterministic scenario execution, staging, staged build, staged regression, commit
+
+bin/promote --domain income_verification   # freeze immutable version + manifest
+make build                                  # REQUIRED: new Go checks compile into the binary
+bin/verify-ruleset --domain income_verification --expect-version <N> --expect-hash <hash>
+```
+
 ---
 
 ## Directory Structure
@@ -71,24 +113,31 @@ make registry
 ```
 doctrust/
   cmd/                          # CLI commands
+    author-check/               # LLM candidate generation (Phase 3 trust funnel)
+    review-check/               # Interactive review + explicit adversarial confirmation
+    promote-check/              # 9-gate promotion pipeline (fail-closed, atomic)
+    verify-ruleset/             # Assert promoted Ruleset version/hash vs manifest
     regression/                 # Scenario regression (Phase 2)
     promote/                    # Ruleset promotion (Phase 2)
     registry/                   # Registry inspection (Phase 2)
     server/                     # HTTP API (Phase 4)
+    doctrust-mcp/               # MCP stdio server (evaluate_case)
     eval/                       # OPA standalone evaluator (reference)
     compare/                    # OPA vs eval cross-validation (reference)
     validate-fixtures/          # OPA fixture validation (reference)
     ingest/                     # Nutrient extraction pipeline
-    compile-policy/             # POLICY.md → Rego compiler (Phase 3)
+    compile-policy/             # POLICY.md → Rego compiler (legacy reference)
   internal/
     types/                      # Leaf shared contracts (DocumentType, EvidenceRef)
     eval/                       # Core eval engine (locked architecture)
     facts/                      # Canonical facts model (Facts, Fact)
     evidence/                   # Evidence model (EvidenceGraph, Document, Claim)
     service/                    # Application boundary (DocTrustService)
+    compiler/                   # Candidate authoring & promotion trust funnel
+                                #   (snapshot, gates, staged build/regression,
+                                #    import allowlist, param resolver)
     ingest/                     # Nutrient-specific ingestion (classifier, normalizer)
     opa/                        # OPA SDK wrapper (reference)
-    compiler/                   # LLM policy compiler (Phase 3)
     nutrient/                   # Nutrient DWS client
     audit/                      # Audit artifact + PDF report
     review/                     # Human review store + disposition
@@ -99,16 +148,20 @@ doctrust/
       v1.manifest.json          # SHA-256 hash + timestamp
       v2.yaml                   # Promoted v2 (tolerance=3%)
       v2.manifest.json
-  scenarios/                    # Scenario YAML files
-    income_verification/
+  scenarios/                    # Regression corpus — promotions merge new check
+    income_verification/        # scenarios here; production loaders read this dir
       check_gross_income_variance.yaml  (6 scenarios)
       check_required_docs.yaml          (5 scenarios)
       check_net_vs_gross.yaml           (3 scenarios)
+  candidates/                   # Authoring workspace (created by author-check)
+    active/<check_id>/          # check.go, metadata.yaml, scenarios.yaml,
+      adversarial.yaml, state, approval.json
+    archive/<check_id>/         # byte-identical snapshot after PROMOTED
   fixtures/                     # Test fixtures
   policies/                     # Rego policies (reference/migration)
   web/                          # Server UI templates
   scripts/                      # PDF generation
-  plans4/                       # Development history (plans, adversarial reviews)
+  plans4/, plans6/              # Development history (plans, adversarial reviews)
 ```
 
 ---
@@ -211,6 +264,10 @@ cp rulesets/income_verification/v1.yaml rulesets/income_verification/working.yam
 # Edit: tolerance 0.05 → 0.03
 ```
 
+> Hand-editing a draft is the manual path for param tweaks on existing checks.
+> For **new check logic**, use the governed path instead — see
+> [Candidate Check Lifecycle](#candidate-check-lifecycle-ai-authoring).
+
 ### Step 3: Run regression
 
 ```bash
@@ -259,10 +316,64 @@ bin/registry
 
 ---
 
+## Candidate Check Lifecycle (AI Authoring)
+
+New check logic enters the runtime only through this funnel. Every gate is
+fail-closed: a rejection leaves `internal/eval`, `rulesets/`, and `scenarios/`
+byte-for-byte unchanged.
+
+```
+DRAFT → HUMAN_REVIEW → APPROVED → PROMOTED
+                     ↘ REJECTED
+```
+
+1. **author-check** generates a candidate from a natural-language intent
+   (OpenRouter; requires `OPENROUTER_API_KEY`).
+2. **Human adversarial review** — you author at least one `human_adversarial`
+   scenario against the check's actual behavior, then approve in
+   **review-check**. Approval reprints the full adversarial YAML and demands an
+   explicit `y`/`Y`; anything else cancels with zero state change.
+3. **Approval binding** — approval.json records SHA-256 hashes of all candidate
+   files plus reviewer identity (`OS user` or `DOCTRUST_REVIEWER` override).
+4. **promote-check** runs nine gates on a single-read snapshot:
+   state APPROVED → adversarial present → approval verified against bytes →
+   import allowlist + module-graph build/vet + Check-ID uniqueness →
+   deterministic scenario execution → staging → staged build of the transformed
+   check against the full module graph → staged regression over the real corpus
+   (same parameter semantics as production) → atomic commit.
+5. **Atomic commit** writes the Go check, updated registry, Ruleset draft
+   (preserving existing CheckRefs and their params), merges scenarios into
+   `scenarios/<domain>/`, and archives the candidate byte-identically.
+6. **bin/promote** freezes the next immutable version + manifest.
+7. **Rebuild**: new Go checks compile into `DefaultRegistry()` — run
+   `make build` before verifying or restarting anything (stale binaries fail
+   verify-ruleset closed).
+8. **verify-ruleset** asserts version and manifest hash; restart the server/MCP
+   process so it loads the promoted version at startup.
+
+Registration uses the struct name extracted by AST from the author's source —
+no naming convention is required or checked. Generated code may import only
+allowlisted packages (`fmt`, `math`, `sort`, `strconv`, `strings`, `time`,
+`internal/{eval,evidence,types,facts}`).
+
+### Environment variables
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `OPENROUTER_API_KEY` | for author-check | LLM generation; fails closed if absent |
+| `OPENROUTER_MODEL` | no | Model override (default: claude-sonnet-4) |
+| `DOCTRUST_REVIEWER` | no | Reviewer identity recorded in approval.json |
+
+---
+
 ## CLI Reference
 
 | Command | Purpose |
 |---------|---------|
+| `bin/author-check --intent "<text>" --domain <domain>` | Generate candidate check + scenarios via LLM |
+| `bin/review-check <candidate-dir>` | Interactive review; explicit adversarial y/N confirmation gates approval |
+| `bin/promote-check --candidate <dir> --domain <domain>` | Run all nine trust gates and atomically promote |
+| `bin/verify-ruleset --domain <domain> [--expect-version N] [--expect-hash H]` | Assert promoted Ruleset identity vs manifest |
 | `bin/regression --domain <domain>` | Run scenario regression (default: Ruleset params) |
 | `bin/regression --domain <domain> --scenario-params` | Legacy mode (scenario-level params) |
 | `bin/regression --domain <domain> --json` | JSON output with audit trail |
@@ -271,8 +382,13 @@ bin/registry
 | `bin/registry` | List all rulesets with versions |
 | `bin/registry --domain <domain>` | Show details for one ruleset |
 | `bin/server --domain <domain>` | HTTP API server |
+| `bin/doctrust-mcp [--rulesets-dir D] [--snapshot-root D]` | MCP stdio server exposing evaluate_case |
 | `bin/eval --policy <path> <snapshot>` | OPA standalone evaluator (reference) |
 | `bin/compare <snapshot>` | Cross-validate OPA vs eval engine (reference) |
+
+Makefile conveniences: `make review-candidate CANDIDATE=<dir>`,
+`make promote-candidate CANDIDATE=<dir> DOMAIN=<domain>`,
+`make verify-ruleset DOMAIN=<domain>`.
 
 ---
 
@@ -289,6 +405,12 @@ go test ./internal/audit/... -v -run TestArtifact       # artifact hash integrit
 bin/regression --domain income_verification             # baseline = 0 changed
 bin/registry                                            # shows all versions
 make lint-imports                                       # provider boundary check
+
+# Candidate lifecycle suites (trust funnel)
+go test ./internal/compiler/...                         # gates, staged build/regression, E2E + failure paths
+go test ./cmd/promote-check/...                         # binary-level duplicate-ID regression
+go test ./cmd/review-check/...                          # adversarial confirmation subprocess tests
+go test ./cmd/verify-ruleset/...                        # version/hash assertion exit codes
 ```
 
 ---
@@ -316,7 +438,7 @@ make lint-imports                                       # provider boundary chec
 | Phase 1 | Frozen | Nutrient integration, evidence normalization, 14/14 strict scenarios |
 | Phase 1 (corrective) | Frozen | Service layer migration, artifact hash fix, lifecycle invariant, provider boundary |
 | Phase 2 | Frozen | Regression CLI, promote CLI, registry CLI, Ruleset params default |
-| Phase 3 | Frozen | Authoring pipeline: AST transform, promotion, 5 trust gates, symlink containment |
+| Phase 3 | Frozen | Candidate Authoring & Trust Funnel — AI-generated candidate → human adversarial review → deterministic execution → staged build/regression → atomic promotion → durable regression coverage → verified runtime Ruleset → MCP/agent evaluation |
 | Phase 4 | Frozen | Enriched evaluation UI, audit artifact with ruleset provenance, bbox grounding, server trust tests |
 
 ---

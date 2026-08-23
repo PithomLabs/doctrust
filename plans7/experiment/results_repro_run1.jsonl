@@ -1,0 +1,2 @@
+{"model":"nvidia/nemotron-3-ultra-550b-a55b:free","arm":"new-retry","attempt":1,"class":"SUCCESS","detail":"full acceptance through Gate 9","snapshot":true,"struct":true,"gate4":true,"scenario_exec":true,"full":true}
+{"model":"nvidia/nemotron-3-ultra-550b-a55b:free","arm":"new-retry","event":"cell-end"}

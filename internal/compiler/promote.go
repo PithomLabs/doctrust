@@ -974,6 +974,12 @@ func StagePromotion(snapshot *CandidateSnapshot, evalDir, domain, rulesetsDir st
 // Invariant: a failed promotion leaves ALL trusted state (check, registry, Ruleset) unchanged.
 // scenariosRoot is the repo-relative scenarios/ directory (e.g. "<repo>/scenarios").
 func CommitPromotion(stagingDir, evalDir, domain, rulesetsDir, scenariosRoot string, snapshot *CandidateSnapshot) error {
+	// B1 hardening: normalize the candidate dir EXACTLY ONCE at the boundary.
+	// A trailing separator would make filepath.Dir return the live candidate
+	// dir itself, deriving an archive destination INSIDE the source tree and
+	// causing a self-copy explosion. Every downstream derivation inherits this.
+	snapshot.Dir = filepath.Clean(snapshot.Dir)
+
 	// Paths we will modify
 	checkDst := filepath.Join(evalDir, fmt.Sprintf("check_%s.go", snapshot.CheckID))
 	checksDst := filepath.Join(evalDir, "checks.go")
@@ -1278,6 +1284,39 @@ func copyFile(src, dst string) error {
 
 // copyDir copies a directory recursively.
 func copyDir(src, dst string) error {
+	// B1 hardening: refuse inverted source/destination relationships.
+	// If dst lies inside src (or vice versa), a directory walk would descend
+	// into its own output and recurse until ENAMETOOLONG. Fail closed BEFORE
+	// any copying begins.
+	srcAbs, err := filepath.Abs(src)
+	if err != nil {
+		return fmt.Errorf("resolve copy source: %w", err)
+	}
+	dstAbs, err := filepath.Abs(dst)
+	if err != nil {
+		return fmt.Errorf("resolve copy destination: %w", err)
+	}
+	if resolved, err := filepath.EvalSymlinks(srcAbs); err == nil {
+		srcAbs = resolved
+	}
+		// dst may not exist yet; resolve its nearest existing ancestor instead.
+		dstProbe := dstAbs
+		for {
+			if resolved, err := filepath.EvalSymlinks(dstProbe); err == nil {
+				rel := strings.TrimPrefix(strings.TrimPrefix(dstAbs, dstProbe), string(filepath.Separator))
+				dstAbs = filepath.Join(resolved, rel)
+				break
+			}
+			parent := filepath.Dir(dstProbe)
+			if parent == dstProbe {
+				break
+			}
+			dstProbe = parent
+		}
+	if isUnder(srcAbs, dstAbs) || isUnder(dstAbs, srcAbs) {
+		return fmt.Errorf("refusing copy: source %q and destination %q overlap", src, dst)
+	}
+
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

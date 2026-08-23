@@ -1,0 +1,1 @@
+{"model":"nvidia/nemotron-3-ultra-550b-a55b:free","arm":"new-retry","attempt":1,"class":"TIMEOUT","detail":"Generating candidate check from LLM...\nLLM error: read response: context deadline exceeded (Client.Timeout or context cancellation while reading body)","snapshot":false,"struct":false,"gate4":false,"scenario_exec":false,"full":false}

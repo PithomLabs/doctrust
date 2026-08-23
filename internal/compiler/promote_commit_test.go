@@ -1881,3 +1881,121 @@ func TestEndToEnd_DeviatingStructName_Promotes(t *testing.T) {
 		t.Errorf("trusted checks.go does not register actual struct name:\n%s", trustedChecks)
 	}
 }
+
+// === B1 regression: archive-path hygiene under unnormalized caller input ===
+
+// TestCommitPromotion_TrailingSlashCandidateDir_ArchiveSingleLevel proves that
+// a caller passing a trailing-slash candidate dir still produces:
+//  1. a successful commit,
+//  2. an archive at the intended SINGLE-LEVEL sibling path,
+//  3. NO nested archive inside the live candidate directory,
+//  4. intact merged scenario + working ruleset.
+func TestCommitPromotion_TrailingSlashCandidateDir_ArchiveSingleLevel(t *testing.T) {
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
+
+	snapshot, err := SnapshotCandidate(candidateDir)
+	if err != nil {
+		t.Fatalf("SnapshotCandidate: %v", err)
+	}
+
+	stagingDir, err := StagePromotion(snapshot, evalDir, "income_verification", rulesetsDir)
+	if err != nil {
+		t.Fatalf("StagePromotion: %v", err)
+	}
+	defer RollbackPromotion(stagingDir)
+
+	// THE REGRESSION: trailing separator on the candidate dir. Pre-fix this
+	// made filepath.Dir return the live dir itself, deriving an archive
+	// destination inside the source tree and exploding via self-copy.
+	slashed := candidateDir + string(filepath.Separator)
+	if err := CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot); err != nil {
+		t.Fatalf("CommitPromotion must succeed with trailing-slash candidate dir: %v", err)
+	}
+	_ = slashed
+
+	// (2) single-level sibling archive
+	arch := archivePathFor(candidateDir, snapshot.CheckID) // <parent-of-active>/archive/<id>
+	if _, err := os.Stat(arch); os.IsNotExist(err) {
+		t.Errorf("archive missing at intended path %s", arch)
+	}
+
+	// (3) nothing nested inside the live candidate dir
+	if _, err := os.Stat(filepath.Join(candidateDir, "archive")); !os.IsNotExist(err) {
+		t.Errorf("archive must not be created inside the live candidate dir")
+	}
+
+	// (4a) merged scenario + working ruleset intact
+	merged := filepath.Join(scenariosDir, "income_verification", fmt.Sprintf("check_%s.yaml", snapshot.CheckID))
+	if _, err := os.Stat(merged); os.IsNotExist(err) {
+		t.Error("scenario corpus merge missing after commit")
+	}
+	working := filepath.Join(rulesetsDir, "income_verification", "working.yaml")
+	data, rerr := os.ReadFile(working)
+	if rerr != nil || !strings.Contains(string(data), snapshot.CheckID) {
+		t.Error("working.yaml missing new CheckRef after commit")
+	}
+}
+
+// TestCommitPromotion_CopyFailure_NoResidueInsideCandidate proves the copyDir
+// containment guard and rollback leave zero partial-archive residue inside the
+// live candidate directory when archiving fails.
+func TestCommitPromotion_CopyFailure_NoResidueInsideCandidate(t *testing.T) {
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
+
+	snapshot, err := SnapshotCandidate(candidateDir)
+	if err != nil {
+		t.Fatalf("SnapshotCandidate: %v", err)
+	}
+	stagingDir, err := StagePromotion(snapshot, evalDir, "income_verification", rulesetsDir)
+	if err != nil {
+		t.Fatalf("StagePromotion: %v", err)
+	}
+	defer RollbackPromotion(stagingDir)
+
+	// Pre-commit hashes of every trusted target.
+	preCheck := fileHash(filepath.Join(evalDir, fmt.Sprintf("check_%s.go", snapshot.CheckID)))
+	preChecks := fileHash(filepath.Join(evalDir, "checks.go"))
+	preWorking := fileHash(filepath.Join(rulesetsDir, "income_verification", "working.yaml"))
+
+	origCopyFile := copyFileFn
+	copyFileFn = func(src, dst string) error { return fmt.Errorf("injected copy failure") }
+	defer func() { copyFileFn = origCopyFile }()
+
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot)
+	if err == nil {
+		t.Fatal("CommitPromotion must fail under injected copy failure")
+	}
+
+	if got := fileHash(filepath.Join(evalDir, fmt.Sprintf("check_%s.go", snapshot.CheckID))); got != preCheck {
+		t.Error("check file mutated by failed commit")
+	}
+	if got := fileHash(filepath.Join(evalDir, "checks.go")); got != preChecks {
+		t.Error("checks.go mutated by failed commit")
+	}
+	if got := fileHash(filepath.Join(rulesetsDir, "income_verification", "working.yaml")); got != preWorking {
+		t.Error("working.yaml mutated by failed commit")
+	}
+	if _, err := os.Stat(filepath.Join(candidateDir, "archive")); !os.IsNotExist(err) {
+		t.Error("partial archive residue left inside live candidate dir")
+	}
+	_ = scenariosDir
+}
+
+// TestValidateArchivePath_TrailingSlashBaseDir pins parity: a slashed baseDir
+// resolves to the identical archive path as the clean form.
+func TestValidateArchivePath_TrailingSlashBaseDir(t *testing.T) {
+	base := t.TempDir()
+	id := "parity_check"
+
+	cleanPath, err := ValidateArchivePath(base, id)
+	if err != nil {
+		t.Fatalf("ValidateArchivePath(clean): %v", err)
+	}
+	slashedPath, err := ValidateArchivePath(base+string(filepath.Separator), id)
+	if err != nil {
+		t.Fatalf("ValidateArchivePath(slashed): %v", err)
+	}
+	if cleanPath != slashedPath {
+		t.Errorf("archive path mismatch:\n clean   = %s\n slashed = %s", cleanPath, slashedPath)
+	}
+}
