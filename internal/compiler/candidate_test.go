@@ -60,7 +60,7 @@ func TestWriteApproval_SetsTimestamp(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "metadata.yaml"), []byte("id: test"), 0644)
 	os.WriteFile(filepath.Join(dir, "adversarial.yaml"), []byte("scenarios: []"), 0644)
 
-	err := WriteApproval(dir, "test_check", "1.0")
+	err := WriteApproval(dir, "test_check", "1.0", "test_user")
 	if err != nil {
 		t.Fatalf("WriteApproval: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestVerifyApproval_IdentityMismatch(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "adversarial.yaml"), []byte("scenarios: []"), 0644)
 
 	// Approve as "check_a" v1.0
-	WriteApproval(dir, "check_a", "1.0")
+	WriteApproval(dir, "check_a", "1.0", "test_user")
 
 	// Verify as "check_b" — should fail
 	err := VerifyApproval(dir, "check_b", "1.0")
@@ -117,7 +117,7 @@ func TestVerifyApproval_ContentChanged(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "metadata.yaml"), []byte("id: test"), 0644)
 	os.WriteFile(filepath.Join(dir, "adversarial.yaml"), []byte("scenarios: []"), 0644)
 
-	WriteApproval(dir, "test_check", "1.0")
+	WriteApproval(dir, "test_check", "1.0", "test_user")
 
 	// Modify check.go after approval
 	os.WriteFile(filepath.Join(dir, "check.go"), []byte("package candidate\n// modified"), 0644)
@@ -168,5 +168,25 @@ func TestHasAdversarial(t *testing.T) {
 				t.Errorf("HasAdversarial() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestWriteApproval_RecordsReviewerID(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "check.go"), []byte("package candidate"), 0644)
+	os.WriteFile(filepath.Join(dir, "scenarios.yaml"), []byte("scenarios: []"), 0644)
+	os.WriteFile(filepath.Join(dir, "metadata.yaml"), []byte("id: test"), 0644)
+
+	err := WriteApproval(dir, "test_check", "1.0", "alice")
+	if err != nil {
+		t.Fatalf("WriteApproval: %v", err)
+	}
+
+	approval, err := LoadApproval(dir)
+	if err != nil {
+		t.Fatalf("LoadApproval: %v", err)
+	}
+	if approval.ReviewerID != "alice" {
+		t.Errorf("expected reviewer_id %q, got %q", "alice", approval.ReviewerID)
 	}
 }

@@ -5,11 +5,14 @@ package compiler
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/doctrust/doctrust/internal/eval"
 )
 
 // fileHash returns the SHA-256 hex of a file's contents, or empty if not exists.
@@ -24,12 +27,13 @@ func fileHash(path string) string {
 
 // setupTestPromotion creates a minimal eval dir + ruleset dir + candidate dir
 // with valid files for testing CommitPromotion.
-func setupTestPromotion(t *testing.T) (evalDir, rulesetsDir, candidateDir string, cleanup func()) {
+func setupTestPromotion(t *testing.T) (evalDir, rulesetsDir, candidateDir, scenariosDir string, cleanup func()) {
 	t.Helper()
 
 	evalDir = t.TempDir()
 	rulesetsDir = t.TempDir()
 	candidateDir = t.TempDir()
+	scenariosDir = t.TempDir()
 
 	// Create eval/checks.go
 	checksContent := `package eval
@@ -87,7 +91,7 @@ func archivePathFor(candidateDir, checkID string) string {
 }
 
 func TestCommitPromotion_Success(t *testing.T) {
-	evalDir, rulesetsDir, candidateDir, _ := setupTestPromotion(t)
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
 
 	snapshot, err := SnapshotCandidate(candidateDir)
 	if err != nil {
@@ -100,7 +104,7 @@ func TestCommitPromotion_Success(t *testing.T) {
 	}
 	defer RollbackPromotion(stagingDir)
 
-	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, snapshot)
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot)
 	if err != nil {
 		t.Fatalf("CommitPromotion: %v", err)
 	}
@@ -138,7 +142,7 @@ func TestCommitPromotion_Success(t *testing.T) {
 }
 
 func TestCommitPromotion_RulesetWriteFailure(t *testing.T) {
-	evalDir, rulesetsDir, candidateDir, _ := setupTestPromotion(t)
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
 
 	snapshot, err := SnapshotCandidate(candidateDir)
 	if err != nil {
@@ -159,12 +163,12 @@ func TestCommitPromotion_RulesetWriteFailure(t *testing.T) {
 
 	// Inject failure: override package-level function variable
 	origFn := addCheckRefFn
-	addCheckRefFn = func(rulesetsDir, domain, checkID, version string) error {
+	addCheckRefFn = func(rulesetsDir, domain, checkID, version string, params map[string]any) error {
 		return fmt.Errorf("injected Ruleset write failure")
 	}
 	defer func() { addCheckRefFn = origFn }()
 
-	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, snapshot)
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot)
 	if err == nil {
 		t.Fatal("CommitPromotion should have failed")
 	}
@@ -188,7 +192,7 @@ func TestCommitPromotion_RulesetWriteFailure(t *testing.T) {
 }
 
 func TestCommitPromotion_CheckWriteFailure(t *testing.T) {
-	evalDir, rulesetsDir, candidateDir, _ := setupTestPromotion(t)
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
 
 	snapshot, err := SnapshotCandidate(candidateDir)
 	if err != nil {
@@ -218,7 +222,7 @@ func TestCommitPromotion_CheckWriteFailure(t *testing.T) {
 	}
 	defer func() { copyFileFn = origCopyFn }()
 
-	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, snapshot)
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot)
 	if err == nil {
 		t.Fatal("CommitPromotion should have failed")
 	}
@@ -234,7 +238,7 @@ func TestCommitPromotion_CheckWriteFailure(t *testing.T) {
 }
 
 func TestCommitPromotion_ChecksGoWriteFailure(t *testing.T) {
-	evalDir, rulesetsDir, candidateDir, _ := setupTestPromotion(t)
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
 
 	snapshot, err := SnapshotCandidate(candidateDir)
 	if err != nil {
@@ -265,7 +269,7 @@ func TestCommitPromotion_ChecksGoWriteFailure(t *testing.T) {
 	}
 	defer func() { copyFileFn = origCopyFn }()
 
-	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, snapshot)
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot)
 	if err == nil {
 		t.Fatal("CommitPromotion should have failed")
 	}
@@ -285,7 +289,7 @@ func TestCommitPromotion_ChecksGoWriteFailure(t *testing.T) {
 }
 
 func TestCommitPromotion_ArchiveFailure(t *testing.T) {
-	evalDir, rulesetsDir, candidateDir, _ := setupTestPromotion(t)
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
 
 	snapshot, err := SnapshotCandidate(candidateDir)
 	if err != nil {
@@ -311,7 +315,7 @@ func TestCommitPromotion_ArchiveFailure(t *testing.T) {
 	}
 	defer func() { copyDirFn = origDirFn }()
 
-	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, snapshot)
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot)
 	if err == nil {
 		t.Fatal("CommitPromotion should have failed")
 	}
@@ -329,14 +333,14 @@ func TestCommitPromotion_ArchiveFailure(t *testing.T) {
 }
 
 func TestAddCheckRefToRuleset_Idempotent(t *testing.T) {
-	_, rulesetsDir, _, _ := setupTestPromotion(t)
+	_, rulesetsDir, _, _, _ := setupTestPromotion(t)
 
-	err := addCheckRefToRuleset(rulesetsDir, "income_verification", "my_new_check", "1.0")
+	err := addCheckRefToRuleset(rulesetsDir, "income_verification", "my_new_check", "1.0", nil)
 	if err != nil {
 		t.Fatalf("first addCheckRefToRuleset: %v", err)
 	}
 
-	err = addCheckRefToRuleset(rulesetsDir, "income_verification", "my_new_check", "1.0")
+	err = addCheckRefToRuleset(rulesetsDir, "income_verification", "my_new_check", "1.0", nil)
 	if err != nil {
 		t.Fatalf("second addCheckRefToRuleset: %v", err)
 	}
@@ -351,16 +355,16 @@ func TestAddCheckRefToRuleset_Idempotent(t *testing.T) {
 }
 
 func TestAddCheckRefToRuleset_SameCheckIDDifferentVersion(t *testing.T) {
-	_, rulesetsDir, _, _ := setupTestPromotion(t)
+	_, rulesetsDir, _, _, _ := setupTestPromotion(t)
 
 	// Add v1
-	err := addCheckRefToRuleset(rulesetsDir, "income_verification", "my_new_check", "1.0")
+	err := addCheckRefToRuleset(rulesetsDir, "income_verification", "my_new_check", "1.0", nil)
 	if err != nil {
 		t.Fatalf("addCheckRefToRuleset v1: %v", err)
 	}
 
 	// Update to v2 — should replace v1
-	err = addCheckRefToRuleset(rulesetsDir, "income_verification", "my_new_check", "2.0")
+	err = addCheckRefToRuleset(rulesetsDir, "income_verification", "my_new_check", "2.0", nil)
 	if err != nil {
 		t.Fatalf("addCheckRefToRuleset v2: %v", err)
 	}
@@ -385,12 +389,12 @@ func TestAddCheckRefToRuleset_SameCheckIDDifferentVersion(t *testing.T) {
 }
 
 func TestAddCheckRefToRuleset_NoWorkingDraft(t *testing.T) {
-	_, rulesetsDir, _, _ := setupTestPromotion(t)
+	_, rulesetsDir, _, _, _ := setupTestPromotion(t)
 
 	// Remove working.yaml if it exists
 	os.Remove(filepath.Join(rulesetsDir, "income_verification", "working.yaml"))
 
-	err := addCheckRefToRuleset(rulesetsDir, "income_verification", "my_new_check", "1.0")
+	err := addCheckRefToRuleset(rulesetsDir, "income_verification", "my_new_check", "1.0", nil)
 	if err != nil {
 		t.Fatalf("addCheckRefToRuleset: %v", err)
 	}
@@ -415,14 +419,14 @@ func TestAddCheckRefToRuleset_NoWorkingDraft(t *testing.T) {
 func TestAddCheckRefToRuleset_NoWorkingNoPromoted(t *testing.T) {
 	emptyDir := t.TempDir()
 
-	err := addCheckRefToRuleset(emptyDir, "nonexistent_domain", "check", "1.0")
+	err := addCheckRefToRuleset(emptyDir, "nonexistent_domain", "check", "1.0", nil)
 	if err == nil {
 		t.Error("expected error when no working draft and no promoted ruleset exist")
 	}
 }
 
 func TestSnapshotCandidate_Immutability(t *testing.T) {
-	_, _, candidateDir, _ := setupTestPromotion(t)
+	_, _, candidateDir, _, _ := setupTestPromotion(t)
 
 	snapshot, err := SnapshotCandidate(candidateDir)
 	if err != nil {
@@ -442,7 +446,7 @@ func TestSnapshotCandidate_Immutability(t *testing.T) {
 }
 
 func TestSnapshotCandidate_ApprovalBinding(t *testing.T) {
-	_, _, candidateDir, _ := setupTestPromotion(t)
+	_, _, candidateDir, _, _ := setupTestPromotion(t)
 
 	snapshot, err := SnapshotCandidate(candidateDir)
 	if err != nil {
@@ -450,7 +454,7 @@ func TestSnapshotCandidate_ApprovalBinding(t *testing.T) {
 	}
 
 	// Write approval with correct hashes
-	err = WriteApproval(candidateDir, snapshot.CheckID, snapshot.Version)
+	err = WriteApproval(candidateDir, snapshot.CheckID, snapshot.Version, "test_user")
 	if err != nil {
 		t.Fatalf("WriteApproval: %v", err)
 	}
@@ -478,7 +482,7 @@ func TestSnapshotCandidate_ApprovalBinding(t *testing.T) {
 }
 
 func TestSnapshotCandidate_ApprovalIdentityMismatch(t *testing.T) {
-	_, _, candidateDir, _ := setupTestPromotion(t)
+	_, _, candidateDir, _, _ := setupTestPromotion(t)
 
 	snapshot, err := SnapshotCandidate(candidateDir)
 	if err != nil {
@@ -486,7 +490,7 @@ func TestSnapshotCandidate_ApprovalIdentityMismatch(t *testing.T) {
 	}
 
 	// Write approval with wrong CheckID
-	err = WriteApproval(candidateDir, "wrong_check_id", snapshot.Version)
+	err = WriteApproval(candidateDir, "wrong_check_id", snapshot.Version, "test_user")
 	if err != nil {
 		t.Fatalf("WriteApproval: %v", err)
 	}
@@ -498,7 +502,7 @@ func TestSnapshotCandidate_ApprovalIdentityMismatch(t *testing.T) {
 }
 
 func TestStaleActiveCandidateNotRePromotable(t *testing.T) {
-	evalDir, rulesetsDir, candidateDir, _ := setupTestPromotion(t)
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
 
 	snapshot, err := SnapshotCandidate(candidateDir)
 	if err != nil {
@@ -512,7 +516,7 @@ func TestStaleActiveCandidateNotRePromotable(t *testing.T) {
 	defer RollbackPromotion(stagingDir)
 
 	// First promotion — success
-	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, snapshot)
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot)
 	if err != nil {
 		t.Fatalf("first CommitPromotion: %v", err)
 	}
@@ -529,6 +533,7 @@ func TestCustomRulesetsDir(t *testing.T) {
 	evalDir := t.TempDir()
 	customRulesets := t.TempDir()
 	candidateDir := t.TempDir()
+	scenariosDir := t.TempDir()
 
 	// Setup eval dir
 	checksContent := `package eval
@@ -583,7 +588,7 @@ func (c *CustomCheck) Evaluate(facts eval.Facts, params map[string]any) eval.Res
 	}
 	defer RollbackPromotion(stagingDir)
 
-	err = CommitPromotion(stagingDir, evalDir, "income_verification", customRulesets, snapshot)
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", customRulesets, scenariosDir, snapshot)
 	if err != nil {
 		t.Fatalf("CommitPromotion: %v", err)
 	}
@@ -607,7 +612,7 @@ func (c *CustomCheck) Evaluate(facts eval.Facts, params map[string]any) eval.Res
 }
 
 func TestArchiveMatchesSnapshot(t *testing.T) {
-	evalDir, rulesetsDir, candidateDir, _ := setupTestPromotion(t)
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
 
 	snapshot, err := SnapshotCandidate(candidateDir)
 	if err != nil {
@@ -620,7 +625,7 @@ func TestArchiveMatchesSnapshot(t *testing.T) {
 	}
 	defer RollbackPromotion(stagingDir)
 
-	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, snapshot)
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot)
 	if err != nil {
 		t.Fatalf("CommitPromotion: %v", err)
 	}
@@ -650,7 +655,7 @@ func TestArchiveMatchesSnapshot(t *testing.T) {
 }
 
 func TestNonFatalCandidateRemoval(t *testing.T) {
-	evalDir, rulesetsDir, candidateDir, _ := setupTestPromotion(t)
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
 
 	snapshot, err := SnapshotCandidate(candidateDir)
 	if err != nil {
@@ -663,7 +668,7 @@ func TestNonFatalCandidateRemoval(t *testing.T) {
 	}
 	defer RollbackPromotion(stagingDir)
 
-	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, snapshot)
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot)
 	if err != nil {
 		t.Fatalf("CommitPromotion: %v", err)
 	}
@@ -822,7 +827,7 @@ func TestStageCandidate_SymlinkRejected(t *testing.T) {
 // === ROLLBACK FAILURE TESTS ===
 
 func TestCommitPromotion_RollbackCheckFails(t *testing.T) {
-	evalDir, rulesetsDir, candidateDir, _ := setupTestPromotion(t)
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
 
 	// Pre-create working.yaml so backup exists and rollback can fail
 	workingPath := filepath.Join(rulesetsDir, "income_verification", "working.yaml")
@@ -854,7 +859,7 @@ func TestCommitPromotion_RollbackCheckFails(t *testing.T) {
 	}
 	defer func() { copyFileFn = origCopyFn }()
 
-	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, snapshot)
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot)
 	if err == nil {
 		t.Fatal("CommitPromotion should have failed")
 	}
@@ -870,7 +875,7 @@ func TestCommitPromotion_RollbackCheckFails(t *testing.T) {
 }
 
 func TestCommitPromotion_RollbackChecksGoFails(t *testing.T) {
-	evalDir, rulesetsDir, candidateDir, _ := setupTestPromotion(t)
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
 
 	// Pre-create check file so backup exists and rollback can fail
 	os.WriteFile(filepath.Join(evalDir, "check_my_new_check.go"), []byte("original check"), 0644)
@@ -901,7 +906,7 @@ func TestCommitPromotion_RollbackChecksGoFails(t *testing.T) {
 	}
 	defer func() { copyFileFn = origCopyFn }()
 
-	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, snapshot)
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot)
 	if err == nil {
 		t.Fatal("CommitPromotion should have failed")
 	}
@@ -916,7 +921,7 @@ func TestCommitPromotion_RollbackChecksGoFails(t *testing.T) {
 }
 
 func TestCommitPromotion_RollbackRulesetFails(t *testing.T) {
-	evalDir, rulesetsDir, candidateDir, _ := setupTestPromotion(t)
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
 
 	// Pre-create files so backups exist and rollbacks can fail
 	os.WriteFile(filepath.Join(evalDir, "check_my_new_check.go"), []byte("original check"), 0644)
@@ -950,7 +955,7 @@ func TestCommitPromotion_RollbackRulesetFails(t *testing.T) {
 	}
 	defer func() { copyFileFn = origCopyFn }()
 
-	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, snapshot)
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot)
 	if err == nil {
 		t.Fatal("CommitPromotion should have failed")
 	}
@@ -1016,5 +1021,863 @@ func TestRestoreOrRemove_RestoreFails_ReturnsError(t *testing.T) {
 	err := restoreOrRemove(backup, target)
 	if err == nil {
 		t.Error("restoreOrRemove should return error when restore fails")
+	}
+}
+
+func TestCommitPromotion_ScenariosMergedToCorpus(t *testing.T) {
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
+
+	// Create proper scenarios for the candidate
+	scenariosContent := `scenarios:
+  - name: "pass_scenario"
+    origin: "real_fixture"
+    input:
+      facts:
+        - semantic_type: "test_value"
+          source_doc: "test"
+          field: "value"
+          value: 100
+          source_span: "page=1"
+          confidence: 0.95
+    expected:
+      check_id: "my_new_check"
+      status: "PASS"
+      severity: "INFO"
+      reason: "always passes"
+`
+	os.WriteFile(filepath.Join(candidateDir, "scenarios.yaml"), []byte(scenariosContent), 0644)
+
+	snapshot, err := SnapshotCandidate(candidateDir)
+	if err != nil {
+		t.Fatalf("SnapshotCandidate: %v", err)
+	}
+
+	stagingDir, err := StagePromotion(snapshot, evalDir, "income_verification", rulesetsDir)
+	if err != nil {
+		t.Fatalf("StagePromotion: %v", err)
+	}
+	defer RollbackPromotion(stagingDir)
+
+	err = CommitPromotion(stagingDir, evalDir, "income_verification", rulesetsDir, scenariosDir, snapshot)
+	if err != nil {
+		t.Fatalf("CommitPromotion: %v", err)
+	}
+
+	// Verify scenario file was merged into the regression corpus
+	mergedPath := filepath.Join(scenariosDir, "income_verification", "check_my_new_check.yaml")
+	if _, err := os.Stat(mergedPath); os.IsNotExist(err) {
+		t.Fatal("merged scenario file should exist in regression corpus")
+	}
+
+	// Verify the merged file contains the scenario
+	data, err := os.ReadFile(mergedPath)
+	if err != nil {
+		t.Fatalf("read merged scenario: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "pass_scenario") {
+		t.Error("merged scenario should contain the scenario name")
+	}
+	if !strings.Contains(content, "my_new_check") {
+		t.Error("merged scenario should contain the check_id")
+	}
+
+	// Verify the scenario can be loaded by the eval engine
+	loadedScenarios, err := eval.LoadAllScenariosFromDir(filepath.Join(scenariosDir, "income_verification"))
+	if err != nil {
+		t.Fatalf("LoadAllScenariosFromDir: %v", err)
+	}
+	found := false
+	for _, s := range loadedScenarios {
+		if s.Name == "pass_scenario" && s.Expected.CheckID == "my_new_check" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("merged scenario not loadable by eval engine")
+	}
+}
+
+func TestValidateStagedArtifact_Success(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping staged compilation test in short mode")
+	}
+
+	repoRoot, err := FindModuleRoot()
+	if err != nil {
+		t.Fatalf("FindModuleRoot: %v", err)
+	}
+
+	// Create a staging dir with a valid transformed check and proper checks.go
+	stagingDir := t.TempDir()
+	os.WriteFile(filepath.Join(stagingDir, "check_genuine_check.go"), []byte(`package eval
+
+import (
+	"fmt"
+	"math"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type GenuineCheck struct{}
+
+func (c *GenuineCheck) ID() string      { return "genuine_check" }
+func (c *GenuineCheck) Version() string { return "1.0" }
+
+func (c *GenuineCheck) Evaluate(facts Facts, params map[string]any) Result {
+	_ = fmt.Sprintf("%.2f", math.Pi)
+	_ = strings.ToLower("test")
+	_ = strconv.Itoa(42)
+	sort.Strings([]string{})
+	_ = time.Now()
+	return Result{Status: StatusPass}
+}
+`), 0644)
+	os.WriteFile(filepath.Join(stagingDir, "checks.go"), []byte(`package eval
+
+func DefaultRegistry() *CheckRegistry {
+	r := NewCheckRegistry()
+	r.Register(&GrossIncomeConsistencyCheck{})
+	r.Register(&RequiredDocumentsCheck{})
+	r.Register(&NetVsGrossIncomparabilityCheck{})
+	r.Register(&GenuineCheck{})
+	return r
+}
+`), 0644)
+
+	evalDir := filepath.Join(repoRoot, "internal", "eval")
+
+	if err := ValidateStagedArtifact(stagingDir, evalDir, repoRoot); err != nil {
+		t.Errorf("ValidateStagedArtifact should succeed for valid code: %v", err)
+	}
+}
+
+func TestValidateStagedArtifact_FailsForInvalidCode(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping staged compilation test in short mode")
+	}
+
+	repoRoot, err := FindModuleRoot()
+	if err != nil {
+		t.Fatalf("FindModuleRoot: %v", err)
+	}
+
+	// Create a staging dir with invalid Go code directly (skip TransformCandidate)
+	stagingDir := t.TempDir()
+	os.WriteFile(filepath.Join(stagingDir, "check_invalid_check.go"), []byte(`package eval
+this is not valid go code !!!
+`), 0644)
+	os.WriteFile(filepath.Join(stagingDir, "checks.go"), []byte(`package eval
+`), 0644)
+
+	evalDir := filepath.Join(repoRoot, "internal", "eval")
+
+	if err := ValidateStagedArtifact(stagingDir, evalDir, repoRoot); err == nil {
+		t.Error("ValidateStagedArtifact should fail for invalid code")
+	}
+}
+
+func TestRunStagedRegression_NoScenarios(t *testing.T) {
+	stagingDir := t.TempDir()
+	evalDir := t.TempDir()
+	domain := "nonexistent_domain"
+	scenariosDir := t.TempDir()
+
+	// Write a valid working ruleset
+	os.WriteFile(filepath.Join(stagingDir, "working.yaml"), []byte(`
+id: nonexistent_domain
+version: "1"
+checks:
+  - id: some_check
+    version: "1.0"
+`), 0644)
+
+	// Create empty corpus directory
+	corpusDir := filepath.Join(scenariosDir, domain)
+	os.MkdirAll(corpusDir, 0755)
+
+	// No scenarios → should pass
+	if err := RunStagedRegression(stagingDir, evalDir, domain, scenariosDir); err != nil {
+		t.Errorf("RunStagedRegression with no scenarios should pass: %v", err)
+	}
+}
+
+func TestRunStagedRegression_FailsWhenScenarioFails(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping staged regression test in short mode")
+	}
+
+	stagingDir := t.TempDir()
+	evalDir := t.TempDir()
+	domain := "test_domain"
+	scenariosDir := t.TempDir()
+
+	// Write a working ruleset that references check_a
+	os.WriteFile(filepath.Join(stagingDir, "working.yaml"), []byte(`
+id: test_domain
+version: "1"
+checks:
+  - id: check_a
+    version: "1.0"
+`), 0644)
+
+	// Create scenarios corpus
+	corpusDir := filepath.Join(scenariosDir, domain)
+	os.MkdirAll(corpusDir, 0755)
+	os.WriteFile(filepath.Join(corpusDir, "test_scenario.yaml"), []byte(`
+scenarios:
+  - name: "expect_pass"
+    origin: "real_fixture"
+    input:
+      facts:
+        - semantic_type: "test"
+          source_doc: "paystub"
+          field: "value"
+          value: 100
+          source_span: "page=1"
+          confidence: 0.95
+    expected:
+      check_id: "check_a"
+      status: "PASS"
+      severity: "INFO"
+      reason: "should pass"
+`), 0644)
+
+	// Run regression — should fail because check_a doesn't exist in registry
+	err := RunStagedRegression(stagingDir, evalDir, domain, scenariosDir)
+	if err == nil {
+		t.Error("RunStagedRegression should fail when scenarios reference nonexistent checks")
+	}
+}
+
+func TestEndToEnd_GateSequence(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping E2E gate-sequence test in short mode")
+	}
+
+	repoRoot, err := FindModuleRoot()
+	if err != nil {
+		t.Fatalf("FindModuleRoot: %v", err)
+	}
+
+	// Use temp dirs for ALL trusted-tree paths so the test never mutates the
+	// real repository. Staged compilation (Gate 7) still compiles against the
+	// real module graph via ValidateStagedArtifact's internal worktree copy.
+	evalDir := t.TempDir()
+	rulesetsDir := t.TempDir()
+	scenariosDir := t.TempDir()
+	candidateDir := t.TempDir()
+	domain := "income_verification"
+
+	// Seed eval dir with a checks.go referencing real eval type names
+	os.WriteFile(filepath.Join(evalDir, "checks.go"), []byte(`package eval
+
+func DefaultRegistry() *CheckRegistry {
+	r := NewCheckRegistry()
+	r.Register(&GrossIncomeConsistencyCheck{})
+	r.Register(&RequiredDocumentsCheck{})
+	r.Register(&NetVsGrossIncomparabilityCheck{})
+	return r
+}
+`), 0644)
+
+	// Create empty scenario corpus directory
+	os.MkdirAll(filepath.Join(scenariosDir, domain), 0755)
+
+	// Create promoted ruleset v1
+	domainDir := filepath.Join(rulesetsDir, domain)
+	os.MkdirAll(domainDir, 0755)
+	os.WriteFile(filepath.Join(domainDir, "v1.yaml"), []byte(`
+id: income_verification
+version: "1"
+checks:
+  - id: gross_income_consistency
+    version: "1.0"
+  - id: required_documents
+    version: "1.0"
+  - id: net_vs_gross_incomparability
+    version: "1.0"
+`), 0644)
+
+	// Create a valid candidate with scenarios + adversarial
+	os.WriteFile(filepath.Join(candidateDir, "metadata.yaml"), []byte("id: e2e_genuine_check\nversion: \"1.0\"\ndescription: end-to-end test check\n"), 0644)
+	os.WriteFile(filepath.Join(candidateDir, "scenarios.yaml"), []byte(`
+scenarios:
+  - name: "passes_when_true"
+    origin: "real_fixture"
+    input:
+      facts:
+        - semantic_type: "test_val"
+          source_doc: "paystub"
+          field: "value"
+          value: 42
+          source_span: "page=1"
+          confidence: 0.95
+    expected:
+      check_id: "e2e_genuine_check"
+      status: "PASS"
+`), 0644)
+	os.WriteFile(filepath.Join(candidateDir, "adversarial.yaml"), []byte(`
+scenarios:
+  - name: "adversarial_edge_case"
+    origin: "human_adversarial"
+    input:
+      facts:
+        - semantic_type: "test_val"
+          source_doc: "paystub"
+          field: "value"
+          value: -1
+          source_span: "page=1"
+          confidence: 0.95
+    expected:
+      check_id: "e2e_genuine_check"
+      status: "PASS"
+`), 0644)
+	os.WriteFile(filepath.Join(candidateDir, "check.go"), []byte(`package candidate
+
+import "github.com/doctrust/doctrust/internal/eval"
+
+type E2eGenuineCheckCheck struct{}
+
+func (c *E2eGenuineCheckCheck) ID() string      { return "e2e_genuine_check" }
+func (c *E2eGenuineCheckCheck) Version() string { return "1.0" }
+
+func (c *E2eGenuineCheckCheck) Evaluate(facts eval.Facts, params map[string]any) eval.Result {
+	return eval.Result{Status: eval.StatusPass}
+}
+`), 0644)
+	os.WriteFile(filepath.Join(candidateDir, "state"), []byte("APPROVED"), 0644)
+
+	// Write approval
+	reviewerID := "test_user"
+	WriteApproval(candidateDir, "e2e_genuine_check", "1.0", reviewerID)
+
+	// === Gate 3: Verify approval against snapshot ===
+	snapshot, err := SnapshotCandidate(candidateDir)
+	if err != nil {
+		t.Fatalf("Gate 3 (SnapshotCandidate): %v", err)
+	}
+	if err := VerifyApprovalAgainstSnapshot(candidateDir, snapshot); err != nil {
+		t.Fatalf("Gate 3 (VerifyApproval): %v", err)
+	}
+
+	// === Gate 4: Validate candidate (real module-graph build/vet + allowlist) ===
+	valResult, err := ValidateSnapshot(snapshot, eval.DefaultRegistry(), rulesetsDir)
+	if err != nil {
+		if valResult != nil {
+			t.Fatalf("Gate 4 (ValidateSnapshot): %v\nerrors: %v", err, valResult.Errors)
+		}
+		t.Fatalf("Gate 4 (ValidateSnapshot): %v", err)
+	}
+
+	// === Gate 5: Execute scenarios ===
+	execResult, err := ExecuteCandidateScenarios(snapshot)
+	if err != nil {
+		t.Fatalf("Gate 5 (ExecuteCandidateScenarios): %v", err)
+	}
+	if execResult.Total < 1 {
+		t.Fatal("Gate 5: zero scenarios executed")
+	}
+	if execResult.Failed > 0 {
+		for _, r := range execResult.Results {
+			if !r.Match {
+				t.Logf("  FAIL %s: expected=%s/%s actual=%s/%s", r.Name, r.Expected.Status, r.Expected.Severity, r.Actual.Status, r.Actual.Severity)
+			}
+		}
+		t.Fatalf("Gate 5: %d scenarios failed", execResult.Failed)
+	}
+
+	// === Gate 6: Stage promotion ===
+	stagingDir, err := StagePromotion(snapshot, evalDir, domain, rulesetsDir)
+	if err != nil {
+		t.Fatalf("Gate 6 (StagePromotion): %v", err)
+	}
+	defer RollbackPromotion(stagingDir)
+
+	// === Gate 7: Staged compilation ===
+	if err := ValidateStagedArtifact(stagingDir, evalDir, repoRoot); err != nil {
+		t.Fatalf("Gate 7 (ValidateStagedArtifact): %v", err)
+	}
+
+	// === Gate 8: Staged regression ===
+	if err := RunStagedRegression(stagingDir, evalDir, domain, scenariosDir); err != nil {
+		t.Fatalf("Gate 8 (RunStagedRegression): %v", err)
+	}
+
+	// === Gate 9: Commit promotion ===
+	if err := CommitPromotion(stagingDir, evalDir, domain, rulesetsDir, scenariosDir, snapshot); err != nil {
+		t.Fatalf("Gate 9 (CommitPromotion): %v", err)
+	}
+
+	// === Verify artifacts in trusted tree ===
+	checkDst := filepath.Join(evalDir, "check_e2e_genuine_check.go")
+	if _, err := os.Stat(checkDst); os.IsNotExist(err) {
+		t.Error("check file not written to trusted tree")
+	}
+
+	checksDst := filepath.Join(evalDir, "checks.go")
+	if _, err := os.Stat(checksDst); os.IsNotExist(err) {
+		t.Error("checks.go not written to trusted tree")
+	}
+	checksContent, _ := os.ReadFile(checksDst)
+	if !strings.Contains(string(checksContent), "E2eGenuineCheckCheck") {
+		t.Error("checks.go does not register E2eGenuineCheckCheck")
+	}
+
+	workingDst := filepath.Join(domainDir, "working.yaml")
+	if _, err := os.Stat(workingDst); os.IsNotExist(err) {
+		t.Error("working.yaml not written to trusted tree")
+	}
+	workingContent, _ := os.ReadFile(workingDst)
+	if !strings.Contains(string(workingContent), "e2e_genuine_check") {
+		t.Error("working.yaml does not include e2e_genuine_check")
+	}
+
+	mergedScenario := filepath.Join(scenariosDir, domain, "check_e2e_genuine_check.yaml")
+	if _, err := os.Stat(mergedScenario); os.IsNotExist(err) {
+		t.Error("scenario not merged to regression corpus")
+	}
+
+	// Production-loader assertion: the merged scenario must be loadable by the
+	// exact loader bin/regression uses, from the same corpus path convention.
+	loaded, err := eval.LoadAllScenariosFromDir(filepath.Join(scenariosDir, domain))
+	if err != nil {
+		t.Fatalf("production loader cannot read promoted corpus: %v", err)
+	}
+	foundMerged := false
+	for _, s := range loaded {
+		if s.Name == "passes_when_true" && s.Expected.CheckID == "e2e_genuine_check" {
+			foundMerged = true
+			break
+		}
+	}
+	if !foundMerged {
+		t.Error("promoted scenario not visible to production regression loader")
+	}
+
+	archiveDir := filepath.Join(filepath.Dir(candidateDir), "archive", "e2e_genuine_check")
+	if _, err := os.Stat(archiveDir); os.IsNotExist(err) {
+		t.Error("candidate not archived")
+	}
+}
+
+// === P1-D: trusted-tree immutability harness ===
+
+// trustedTreeHashes returns a path→sha256 map of every file under the roots.
+func trustedTreeHashes(dirs ...string) map[string]string {
+	out := map[string]string{}
+	for _, root := range dirs {
+		filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			sum := sha256.Sum256(data)
+			out[path] = hex.EncodeToString(sum[:])
+			return nil
+		})
+	}
+	return out
+}
+
+// assertTrustedTreeUnchanged fails the test if any file changed, appeared, or
+// disappeared relative to the before snapshot.
+func assertTrustedTreeUnchanged(t *testing.T, before map[string]string, dirs ...string) {
+	t.Helper()
+	after := trustedTreeHashes(dirs...)
+	if len(before) != len(after) {
+		t.Fatalf("trusted tree file count changed: before=%d after=%d", len(before), len(after))
+	}
+	for path, sum := range before {
+		if after[path] != sum {
+			t.Errorf("trusted tree mutated byte-for-byte: %s", path)
+		}
+	}
+}
+
+// runPromotionGates mirrors cmd/promote-check main() gate ordering (Gates 4–9)
+// against a production-shaped temp trusted tree. The returned error is
+// prefixed with the gate that rejected the candidate.
+func runPromotionGates(repoRoot string, snapshot *CandidateSnapshot, evalDir, domain, rulesetsDir, scenariosDir string) error {
+	// Gate 4: ValidateSnapshot (real module-graph build/vet + allowlist + uniqueness)
+	if _, err := ValidateSnapshot(snapshot, eval.DefaultRegistry(), rulesetsDir); err != nil {
+		return fmt.Errorf("gate4: %w", err)
+	}
+
+	// Gate 5: deterministic candidate scenario execution
+	execResult, err := ExecuteCandidateScenarios(snapshot)
+	if err != nil {
+		return fmt.Errorf("gate5: %w", err)
+	}
+	if execResult.Total < 1 {
+		return fmt.Errorf("gate5: zero scenarios executed")
+	}
+	if execResult.Failed > 0 {
+		return fmt.Errorf("gate5: %d scenario(s) failed", execResult.Failed)
+	}
+
+	// Gate 6: stage promotion
+	stagingDir, err := StagePromotion(snapshot, evalDir, domain, rulesetsDir)
+	if err != nil {
+		return fmt.Errorf("gate6: %w", err)
+	}
+	defer RollbackPromotion(stagingDir)
+
+	// Gate 7: staged compilation against full module graph
+	if err := ValidateStagedArtifact(stagingDir, evalDir, repoRoot); err != nil {
+		return fmt.Errorf("gate7: %w", err)
+	}
+
+	// Gate 8: staged regression with production parameter semantics
+	if err := RunStagedRegression(stagingDir, evalDir, domain, scenariosDir); err != nil {
+		return fmt.Errorf("gate8: %w", err)
+	}
+
+	// Gate 9: atomic commit
+	return CommitPromotion(stagingDir, evalDir, domain, rulesetsDir, scenariosDir, snapshot)
+}
+
+// setupGateSequenceEnv builds a production-shaped temp trusted tree:
+// evalDir (seeded checks.go), rulesetsDir/<domain>/v1.yaml, empty corpus,
+// and an APPROVED candidate bound to a valid approval record.
+func setupGateSequenceEnv(t *testing.T, checkSource, scenariosYAML string) (repoRoot, evalDir, rulesetsDir, scenariosDir, candidateDir, domain string) {
+	t.Helper()
+
+	repoRoot, err := FindModuleRoot()
+	if err != nil {
+		t.Fatalf("FindModuleRoot: %v", err)
+	}
+	evalDir = t.TempDir()
+	rulesetsDir = t.TempDir()
+	scenariosDir = t.TempDir()
+	candidateDir = t.TempDir()
+	domain = "income_verification"
+
+	os.MkdirAll(filepath.Join(evalDir), 0755)
+	os.WriteFile(filepath.Join(evalDir, "checks.go"), []byte(`package eval
+
+func DefaultRegistry() *CheckRegistry {
+	r := NewCheckRegistry()
+	r.Register(&GrossIncomeConsistencyCheck{})
+	r.Register(&RequiredDocumentsCheck{})
+	r.Register(&NetVsGrossIncomparabilityCheck{})
+	return r
+}
+`), 0644)
+
+	domainDir := filepath.Join(rulesetsDir, domain)
+	os.MkdirAll(domainDir, 0755)
+	os.WriteFile(filepath.Join(domainDir, "v1.yaml"), []byte(`id: income_verification
+version: "1"
+checks:
+  - id: gross_income_consistency
+    version: "1.0"
+  - id: required_documents
+    version: "1.0"
+`), 0644)
+
+	os.MkdirAll(filepath.Join(scenariosDir, domain), 0755)
+
+	os.WriteFile(filepath.Join(candidateDir, "metadata.yaml"), []byte("id: gate_seq_check\nversion: \"1.0\"\ndescription: gate-sequence probe\n"), 0644)
+	if scenariosYAML == "" {
+		scenariosYAML = `scenarios:
+  - name: probe_passes
+    origin: real_fixture
+    input:
+      facts:
+        - semantic_type: probe_value
+          source_doc: paystub
+          field: value
+          value: 1
+          source_span: "page=1"
+          confidence: 0.95
+    expected:
+      check_id: gate_seq_check
+      status: PASS
+`
+	}
+	os.WriteFile(filepath.Join(candidateDir, "scenarios.yaml"), []byte(scenariosYAML), 0644)
+	os.WriteFile(filepath.Join(candidateDir, "adversarial.yaml"), []byte(`scenarios:
+  - name: adversarial_edge
+    origin: human_adversarial
+    input:
+      facts:
+        - semantic_type: probe_value
+          source_doc: paystub
+          field: value
+          value: -1
+          source_span: "page=1"
+          confidence: 0.95
+    expected:
+      check_id: gate_seq_check
+      status: PASS
+`), 0644)
+	os.WriteFile(filepath.Join(candidateDir, "check.go"), []byte(checkSource), 0644)
+	os.WriteFile(filepath.Join(candidateDir, "state"), []byte("APPROVED"), 0644)
+
+	if err := WriteApproval(candidateDir, "gate_seq_check", "1.0", "test_user"); err != nil {
+		t.Fatalf("WriteApproval: %v", err)
+	}
+	return repoRoot, evalDir, rulesetsDir, scenariosDir, candidateDir, domain
+}
+
+const gateSeqPassingSource = `package candidate
+
+import "github.com/doctrust/doctrust/internal/eval"
+
+type GateSeqCheckCheck struct{}
+
+func (c *GateSeqCheckCheck) ID() string      { return "gate_seq_check" }
+func (c *GateSeqCheckCheck) Version() string { return "1.0" }
+
+func (c *GateSeqCheckCheck) Evaluate(facts eval.Facts, params map[string]any) eval.Result {
+	return eval.Result{Status: eval.StatusPass}
+}
+`
+
+func TestGateSequence_Failure_ForbiddenImport_NoMutation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping gate-sequence test in short mode")
+	}
+	forbiddenSource := `package candidate
+
+import (
+	"os"
+
+	"github.com/doctrust/doctrust/internal/eval"
+)
+
+type GateSeqCheckCheck struct{}
+
+func (c *GateSeqCheckCheck) ID() string      { return "gate_seq_check" }
+func (c *GateSeqCheckCheck) Version() string { return "1.0" }
+
+func (c *GateSeqCheckCheck) Evaluate(facts eval.Facts, params map[string]any) eval.Result {
+	_ = os.Getenv("PATH")
+	return eval.Result{Status: eval.StatusPass}
+}
+`
+	repoRoot, evalDir, rulesetsDir, scenariosDir, candidateDir, domain := setupGateSequenceEnv(t, forbiddenSource, "")
+	snapshot, err := SnapshotCandidate(candidateDir)
+	if err != nil {
+		t.Fatalf("SnapshotCandidate: %v", err)
+	}
+
+	dirs := []string{evalDir, rulesetsDir, scenariosDir, candidateDir}
+	before := trustedTreeHashes(dirs...)
+
+	err = runPromotionGates(repoRoot, snapshot, evalDir, domain, rulesetsDir, scenariosDir)
+	if err == nil {
+		t.Fatal("promotion must fail on forbidden import")
+	}
+	if !strings.HasPrefix(err.Error(), "gate4") {
+		t.Errorf("expected rejection at gate4, got: %v", err)
+	}
+	assertTrustedTreeUnchanged(t, before, dirs...)
+}
+
+func TestGateSequence_Failure_SymbolCollision_NoMutation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping gate-sequence test in short mode")
+	}
+	// Compiles standalone (package candidate) but collides after transform
+	// into package eval, which already declares Result. The colliding type is
+	// declared AFTER the check struct so struct selection stays correct.
+	collisionSource := `package candidate
+
+import "github.com/doctrust/doctrust/internal/eval"
+
+type GateSeqCheckCheck struct{}
+
+func (c *GateSeqCheckCheck) ID() string      { return "gate_seq_check" }
+func (c *GateSeqCheckCheck) Version() string { return "1.0" }
+
+func (c *GateSeqCheckCheck) Evaluate(facts eval.Facts, params map[string]any) eval.Result {
+	return eval.Result{Status: eval.StatusPass}
+}
+
+type Result struct{ Dummy int }
+`
+	repoRoot, evalDir, rulesetsDir, scenariosDir, candidateDir, domain := setupGateSequenceEnv(t, collisionSource, "")
+	snapshot, err := SnapshotCandidate(candidateDir)
+	if err != nil {
+		t.Fatalf("SnapshotCandidate: %v", err)
+	}
+
+	dirs := []string{evalDir, rulesetsDir, scenariosDir, candidateDir}
+	before := trustedTreeHashes(dirs...)
+
+	err = runPromotionGates(repoRoot, snapshot, evalDir, domain, rulesetsDir, scenariosDir)
+	if err == nil {
+		t.Fatal("promotion must fail on symbol collision in transformed artifact")
+	}
+	if !strings.HasPrefix(err.Error(), "gate7") {
+		t.Errorf("expected rejection at gate7, got: %v", err)
+	}
+	assertTrustedTreeUnchanged(t, before, dirs...)
+}
+
+func TestGateSequence_Failure_ScenarioMismatch_NoMutation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping gate-sequence test in short mode")
+	}
+	mismatchScenarios := `scenarios:
+  - name: probe_expects_review
+    origin: real_fixture
+    input:
+      facts:
+        - semantic_type: probe_value
+          source_doc: paystub
+          field: value
+          value: 1
+          source_span: "page=1"
+          confidence: 0.95
+    expected:
+      check_id: gate_seq_check
+      status: REVIEW
+      severity: WARNING
+`
+	repoRoot, evalDir, rulesetsDir, scenariosDir, candidateDir, domain := setupGateSequenceEnv(t, gateSeqPassingSource, mismatchScenarios)
+	snapshot, err := SnapshotCandidate(candidateDir)
+	if err != nil {
+		t.Fatalf("SnapshotCandidate: %v", err)
+	}
+
+	dirs := []string{evalDir, rulesetsDir, scenariosDir, candidateDir}
+	before := trustedTreeHashes(dirs...)
+
+	err = runPromotionGates(repoRoot, snapshot, evalDir, domain, rulesetsDir, scenariosDir)
+	if err == nil {
+		t.Fatal("promotion must fail when scenarios mismatch actual behavior")
+	}
+	if !strings.HasPrefix(err.Error(), "gate5") {
+		t.Errorf("expected rejection at gate5, got: %v", err)
+	}
+	assertTrustedTreeUnchanged(t, before, dirs...)
+}
+
+func TestGateSequence_Failure_StagedRegression_NoMutation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping gate-sequence test in short mode")
+	}
+	repoRoot, evalDir, rulesetsDir, scenariosDir, candidateDir, domain := setupGateSequenceEnv(t, gateSeqPassingSource, "")
+
+	// Poison the existing regression corpus with a scenario whose check_id has
+	// no registered implementation — staged regression must reject.
+	poisonPath := filepath.Join(scenariosDir, domain, "poison.yaml")
+	os.WriteFile(poisonPath, []byte(`scenarios:
+  - name: references_unknown_check
+    origin: real_fixture
+    input:
+      facts:
+        - semantic_type: probe_value
+          source_doc: paystub
+          field: value
+          value: 1
+          source_span: "page=1"
+          confidence: 0.95
+    expected:
+      check_id: no_such_check_exists
+      status: PASS
+`), 0644)
+
+	snapshot, err := SnapshotCandidate(candidateDir)
+	if err != nil {
+		t.Fatalf("SnapshotCandidate: %v", err)
+	}
+
+	dirs := []string{evalDir, rulesetsDir, scenariosDir, candidateDir}
+	before := trustedTreeHashes(dirs...)
+
+	err = runPromotionGates(repoRoot, snapshot, evalDir, domain, rulesetsDir, scenariosDir)
+	if err == nil {
+		t.Fatal("promotion must fail when staged regression rejects the corpus")
+	}
+	if !strings.HasPrefix(err.Error(), "gate8") {
+		t.Errorf("expected rejection at gate8, got: %v", err)
+	}
+	assertTrustedTreeUnchanged(t, before, dirs...)
+}
+
+// === adv_review3 P0-A: registration must use the author's actual struct name ===
+
+// DeviatingSource declares a struct name that deliberately violates any
+// check_id-derived naming convention. Old registration logic derived
+// "&GateSeqCheckCheck{}" from the id and died at Gate 7 on this exact input.
+const deviatingSource = `package candidate
+
+import "github.com/doctrust/doctrust/internal/eval"
+
+type WeirdlyNamedProbe struct{}
+
+func (c *WeirdlyNamedProbe) ID() string      { return "gate_seq_check" }
+func (c *WeirdlyNamedProbe) Version() string { return "1.0" }
+
+func (c *WeirdlyNamedProbe) Evaluate(facts eval.Facts, params map[string]any) eval.Result {
+	return eval.Result{Status: eval.StatusPass}
+}
+`
+
+func TestStagePromotion_RegistrationUsesActualStructName(t *testing.T) {
+	evalDir, rulesetsDir, candidateDir, scenariosDir, _ := setupTestPromotion(t)
+
+	// Overwrite candidate source with the convention-deviating struct.
+	os.WriteFile(filepath.Join(candidateDir, "check.go"), []byte(deviatingSource), 0644)
+
+	snapshot, err := SnapshotCandidate(candidateDir)
+	if err != nil {
+		t.Fatalf("SnapshotCandidate: %v", err)
+	}
+
+	stagingDir, err := StagePromotion(snapshot, evalDir, "income_verification", rulesetsDir)
+	if err != nil {
+		t.Fatalf("StagePromotion must succeed for convention-deviating struct name: %v", err)
+	}
+	defer RollbackPromotion(stagingDir)
+
+	checksData, err := os.ReadFile(filepath.Join(stagingDir, "checks.go"))
+	if err != nil {
+		t.Fatalf("read staged checks.go: %v", err)
+	}
+	staged := string(checksData)
+	if !strings.Contains(staged, "&WeirdlyNamedProbe{}") {
+		t.Errorf("staged checks.go must register the ACTUAL struct name; got:\n%s", staged)
+	}
+	if strings.Contains(staged, "GateSeqCheckCheck") {
+		t.Errorf("staged checks.go still references id-derived symbol GateSeqCheckCheck:\n%s", staged)
+	}
+	_ = scenariosDir
+}
+
+func TestEndToEnd_DeviatingStructName_Promotes(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping gate-sequence test in short mode")
+	}
+
+	repoRoot, evalDir, rulesetsDir, scenariosDir, candidateDir, domain := setupGateSequenceEnv(t, deviatingSource, "")
+	snapshot, err := SnapshotCandidate(candidateDir)
+	if err != nil {
+		t.Fatalf("SnapshotCandidate: %v", err)
+	}
+
+	if err := runPromotionGates(repoRoot, snapshot, evalDir, domain, rulesetsDir, scenariosDir); err != nil {
+		t.Fatalf("convention-deviating candidate must survive ALL gates: %v", err)
+	}
+
+	trustedChecks, err := os.ReadFile(filepath.Join(evalDir, "checks.go"))
+	if err != nil {
+		t.Fatalf("read trusted checks.go: %v", err)
+	}
+	if !strings.Contains(string(trustedChecks), "&WeirdlyNamedProbe{}") {
+		t.Errorf("trusted checks.go does not register actual struct name:\n%s", trustedChecks)
 	}
 }

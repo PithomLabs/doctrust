@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/doctrust/doctrust/internal/eval"
 )
@@ -27,14 +28,23 @@ func main() {
 			os.Exit(1)
 		}
 	} else {
-		// Load from registry working directory
+		// Load from registry working directory.
+		// LoadWorking returns Version="draft" BOTH when the file is missing and
+		// when a pipeline-written draft carries the "draft" sentinel — so test
+		// existence explicitly. Promotion derives the real version number itself
+		// (registry.Promote), so the sentinel must not block freezing.
+		workingPath := filepath.Join("rulesets", *domain, "working.yaml")
+		if _, statErr := os.Stat(workingPath); os.IsNotExist(statErr) {
+			fmt.Fprintf(os.Stderr, "Error: no working draft found. Create one first with:\n  echo 'checks: [...]'\n  > rulesets/%s/working.yaml\n", *domain)
+			os.Exit(1)
+		}
 		rs, err = registry.LoadWorking(*domain)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: cannot load working draft for %s: %v\n", *domain, err)
 			os.Exit(1)
 		}
-		if rs.Version == "draft" || rs.Version == "" {
-			fmt.Fprintf(os.Stderr, "Error: no working draft found. Create one first with:\n  echo 'checks: [...]'\n  > rulesets/%s/working.yaml\n", *domain)
+		if rs.Version == "" {
+			fmt.Fprintf(os.Stderr, "Error: working draft for %s has empty version field.\n", *domain)
 			os.Exit(1)
 		}
 	}

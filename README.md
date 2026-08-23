@@ -246,6 +246,10 @@ bin/promote --domain income_verification
 # Promoted: income_verification v2
 ```
 
+> **Rebuild after promoting new Go checks.** Check registration compiles into
+> `DefaultRegistry()`, so a promotion that adds a Go check requires
+> `make build` before `bin/verify-ruleset` or any runtime restart.
+
 ### Step 5: Runtime uses new version
 
 ```bash

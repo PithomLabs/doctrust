@@ -6,7 +6,7 @@ scenarios:
         - semantic_type: "gross_income_projected"
           source_doc: "paystub"
           field: "annualized_gross_ytd"
-          value: 125000
+          value: 121000
           source_span: "page=1;bbox=[508,274,50,8]"
           confidence: 0.95
         - semantic_type: "gross_income_taxable"
@@ -28,7 +28,7 @@ scenarios:
           source_span: "page=1;bbox=[207,189,45,8]"
           confidence: 0.95
     params:
-      tolerance: 0.05
+      tolerance: 0.03
     expected:
       check_id: "gross_income_consistency"
       status: "PASS"
@@ -73,7 +73,7 @@ scenarios:
           source_span: "page=1;bbox=[1418,803,139,30]"
           confidence: 0.95
     params:
-      tolerance: 0.05
+      tolerance: 0.03
     expected:
       check_id: "gross_income_consistency"
       status: "REVIEW"
@@ -100,7 +100,7 @@ scenarios:
         - semantic_type: "gross_income_projected"
           source_doc: "paystub"
           field: "annualized_gross_ytd"
-          value: 126000
+          value: 123000
           source_span: "page=1;bbox=[463,947,707,27]"
           confidence: 0.95
         - semantic_type: "gross_income_taxable"
@@ -116,7 +116,7 @@ scenarios:
           source_span: "page=1;bbox=[1126,714,156,36]"
           confidence: 0.95
     params:
-      tolerance: 0.05
+      tolerance: 0.03
     expected:
       check_id: "gross_income_consistency"
       status: "PASS"
@@ -139,7 +139,7 @@ scenarios:
         - semantic_type: "gross_income_projected"
           source_doc: "paystub"
           field: "annualized_gross_ytd"
-          value: 126001
+          value: 124000
           source_span: "page=1;bbox=[463,947,707,27]"
           confidence: 0.95
         - semantic_type: "gross_income_taxable"
@@ -155,12 +155,12 @@ scenarios:
           source_span: "page=1;bbox=[1126,714,156,36]"
           confidence: 0.95
     params:
-      tolerance: 0.05
+      tolerance: 0.03
     expected:
       check_id: "gross_income_consistency"
       status: "REVIEW"
       severity: "WARNING"
-      reason: "Paystub projected gross exceeds corroborated taxable income by 5.0% (tolerance: 5.0%)"
+      reason: "Paystub projected gross exceeds corroborated taxable income by 3.3% (tolerance: 3.0%)"
       evidence:
         - field: "gross_income_projected"
           source_doc: "paystub"
@@ -194,12 +194,12 @@ scenarios:
           source_span: "page=1;bbox=[1126,714,156,36]"
           confidence: 0.95
     params:
-      tolerance: 0.05
+      tolerance: 0.03
     expected:
       check_id: "gross_income_consistency"
       status: "REVIEW"
       severity: "WARNING"
-      reason: "Paystub projected gross exceeds corroborated taxable income by 25.0% (tolerance: 5.0%)"
+      reason: "Paystub projected gross exceeds corroborated taxable income by 25.0% (tolerance: 3.0%)"
       evidence:
         - field: "gross_income_projected"
           source_doc: "paystub"
@@ -233,7 +233,7 @@ scenarios:
           source_span: "page=1;bbox=[1418,803,139,30]"
           confidence: 0.95
     params:
-      tolerance: 0.05
+      tolerance: 0.03
     expected:
       check_id: "gross_income_consistency"
       status: "REVIEW"

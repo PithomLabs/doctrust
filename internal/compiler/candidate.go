@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -50,10 +51,10 @@ type FactDef struct {
 
 // ScenarioExpect holds the expected result for a scenario.
 type ScenarioExpect struct {
-	CheckID  string      `json:"check_id" yaml:"check_id"`
-	Status   string      `json:"status" yaml:"status"`
-	Severity string      `json:"severity" yaml:"severity"`
-	Reason   string      `json:"reason" yaml:"reason"`
+	CheckID  string        `json:"check_id" yaml:"check_id"`
+	Status   string        `json:"status" yaml:"status"`
+	Severity string        `json:"severity" yaml:"severity"`
+	Reason   string        `json:"reason" yaml:"reason"`
 	Evidence []EvidenceDef `json:"evidence" yaml:"evidence"`
 }
 
@@ -69,15 +70,15 @@ type EvidenceDef struct {
 type CandidateState string
 
 const (
-	StateDraft        CandidateState = "DRAFT"
-	StateHumanReview  CandidateState = "HUMAN_REVIEW"
-	StateApproved     CandidateState = "APPROVED"
-	StateRejected     CandidateState = "REJECTED"
-	StateTransformed  CandidateState = "TRANSFORMED"
-	StateBuilt        CandidateState = "BUILT"
-	StateVerified     CandidateState = "VERIFIED"
-	StatePromoted     CandidateState = "PROMOTED"
-	StateArchived     CandidateState = "ARCHIVED"
+	StateDraft       CandidateState = "DRAFT"
+	StateHumanReview CandidateState = "HUMAN_REVIEW"
+	StateApproved    CandidateState = "APPROVED"
+	StateRejected    CandidateState = "REJECTED"
+	StateTransformed CandidateState = "TRANSFORMED"
+	StateBuilt       CandidateState = "BUILT"
+	StateVerified    CandidateState = "VERIFIED"
+	StatePromoted    CandidateState = "PROMOTED"
+	StateArchived    CandidateState = "ARCHIVED"
 )
 
 // ApprovalData holds content hashes at approval time.
@@ -89,6 +90,7 @@ type ApprovalData struct {
 	MetadataHash    string `json:"metadata_hash"`
 	AdversarialHash string `json:"adversarial_hash"`
 	ApprovedAt      string `json:"approved_at"`
+	ReviewerID      string `json:"reviewer_id"`
 }
 
 // CandidateSnapshot holds the exact bytes of a validated candidate.
@@ -97,6 +99,7 @@ type ApprovalData struct {
 type CandidateSnapshot struct {
 	CheckID     string
 	Version     string
+	Parameters  map[string]any
 	GoSource    []byte            // check.go content
 	Metadata    []byte            // metadata.yaml content
 	Scenarios   []byte            // scenarios.yaml content
@@ -111,7 +114,7 @@ type CandidateSnapshot struct {
 // filesystem reads of the candidate directory occur after this call.
 func SnapshotCandidate(candidateDir string) (*CandidateSnapshot, error) {
 	snap := &CandidateSnapshot{
-		Dir:   candidateDir,
+		Dir:    candidateDir,
 		Hashes: make(map[string]string),
 	}
 
@@ -135,14 +138,16 @@ func SnapshotCandidate(candidateDir string) (*CandidateSnapshot, error) {
 
 	// Parse metadata for identity
 	var meta struct {
-		ID      string `yaml:"id"`
-		Version string `yaml:"version"`
+		ID         string         `yaml:"id"`
+		Version    string         `yaml:"version"`
+		Parameters map[string]any `yaml:"parameters"`
 	}
 	if err := yaml.Unmarshal(snap.Metadata, &meta); err != nil {
 		return nil, fmt.Errorf("parse metadata.yaml: %w", err)
 	}
 	snap.CheckID = meta.ID
 	snap.Version = meta.Version
+	snap.Parameters = meta.Parameters
 
 	// Read scenarios.yaml
 	data, err = os.ReadFile(filepath.Join(candidateDir, "scenarios.yaml"))
@@ -397,8 +402,17 @@ func StageCandidate(candidate *CheckCandidate, baseDir string) (string, error) {
 	return dir, nil
 }
 
+// GetCurrentUser returns the current OS username, or "unknown" if unavailable.
+func GetCurrentUser() string {
+	u, err := user.Current()
+	if err != nil {
+		return "unknown"
+	}
+	return u.Username
+}
+
 // WriteApproval writes approval.json with content hashes and candidate identity.
-func WriteApproval(candidateDir string, checkID, version string) error {
+func WriteApproval(candidateDir string, checkID, version, reviewerID string) error {
 	hashes, err := ComputeCandidateHashes(candidateDir)
 	if err != nil {
 		return err
@@ -411,6 +425,7 @@ func WriteApproval(candidateDir string, checkID, version string) error {
 		MetadataHash:    hashes["metadata.yaml"],
 		AdversarialHash: hashes["adversarial.yaml"],
 		ApprovedAt:      time.Now().UTC().Format(time.RFC3339),
+		ReviewerID:      reviewerID,
 	}
 	data, err := json.MarshalIndent(approval, "", "  ")
 	if err != nil {

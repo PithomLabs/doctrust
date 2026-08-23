@@ -11,6 +11,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/doctrust/doctrust/internal/compiler"
 	"github.com/doctrust/doctrust/internal/eval"
 )
 
@@ -91,9 +92,11 @@ func main() {
 			cParams = s.Params
 			paramSources = append(paramSources, paramSource{Baseline: "scenario", Candidate: "scenario"})
 		} else {
-			// Default: use Ruleset params (the actual Phase 2 behavior)
-			bParams = resolveRulesetParams(baseline, s.Expected.CheckID, s.Params)
-			cParams = resolveRulesetParams(candidate, s.Expected.CheckID, s.Params)
+			// Default: use Ruleset params (the actual Phase 2 behavior).
+			// Shared single-source-of-truth resolver — identical semantics to
+			// the staged regression gate in internal/compiler.
+			bParams = compiler.ResolveRulesetParams(baseline, s.Expected.CheckID, s.Params)
+			cParams = compiler.ResolveRulesetParams(candidate, s.Expected.CheckID, s.Params)
 			paramSources = append(paramSources, paramSource{Baseline: "ruleset", Candidate: "ruleset"})
 		}
 
@@ -112,7 +115,7 @@ func main() {
 		Changed     bool                      `json:"changed"`
 		Diff        *eval.ScenarioDiffSummary `json:"diff,omitempty"`
 		Baseline    eval.ScenarioResult       `json:"baseline"`
-		Candidate   eval.ScenarioResult      `json:"candidate"`
+		Candidate   eval.ScenarioResult       `json:"candidate"`
 		ParamSource paramSource               `json:"param_source"`
 	}
 
@@ -213,17 +216,6 @@ func main() {
 	}
 
 	w.Flush()
-}
-
-// resolveRulesetParams returns the Ruleset's params for the given check ID,
-// falling back to scenario params if the check is not in the Ruleset.
-func resolveRulesetParams(rs eval.Ruleset, checkID string, fallback map[string]any) map[string]any {
-	for _, ref := range rs.Checks {
-		if ref.ID == checkID && ref.Params != nil {
-			return ref.Params
-		}
-	}
-	return fallback
 }
 
 // summarizeParams returns a human-readable summary of a Ruleset's params.

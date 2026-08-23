@@ -1,6 +1,8 @@
 package compiler
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -13,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/doctrust/doctrust/internal/eval"
+	"gopkg.in/yaml.v3"
 )
 
 // CandidateValidationResult holds the result of candidate validation.
@@ -60,6 +63,21 @@ func ValidateCandidate(candidateDir string, registry *eval.CheckRegistry) (*Cand
 		return nil, fmt.Errorf("human-authored adversarial scenario required")
 	}
 
+	// Validate imports against allowlist (positive allowlist, default-deny)
+	candidateGoSrc, err := os.ReadFile(filepath.Join(candidateDir, "check.go"))
+	if err != nil {
+		return nil, fmt.Errorf("read check.go: %w", err)
+	}
+	if violations, err := ValidateImports(candidateGoSrc); err != nil {
+		return nil, fmt.Errorf("import validation parse error: %w", err)
+	} else if len(violations) > 0 {
+		var paths []string
+		for _, v := range violations {
+			paths = append(paths, v.PackagePath)
+		}
+		return nil, fmt.Errorf("forbidden imports: %s", strings.Join(paths, ", "))
+	}
+
 	// Check ID uniqueness
 	if _, err := registry.Get(candidate.CheckID); err == nil {
 		return nil, fmt.Errorf("check ID %s already registered", candidate.CheckID)
@@ -90,7 +108,7 @@ func ValidateCandidate(candidateDir string, registry *eval.CheckRegistry) (*Cand
 
 // ValidateSnapshot runs the full validation cascade on a snapshot (not files on disk).
 // Writes snapshot bytes to a temp dir for go build/vet, then cleans up.
-func ValidateSnapshot(snapshot *CandidateSnapshot, registry *eval.CheckRegistry) (*CandidateValidationResult, error) {
+func ValidateSnapshot(snapshot *CandidateSnapshot, registry *eval.CheckRegistry, rulesetsDir string) (*CandidateValidationResult, error) {
 	result := &CandidateValidationResult{}
 
 	// Verify approval against snapshot bytes (not filesystem)
@@ -104,30 +122,75 @@ func ValidateSnapshot(snapshot *CandidateSnapshot, registry *eval.CheckRegistry)
 		return nil, fmt.Errorf("human-authored adversarial scenario required")
 	}
 
-	// Check ID uniqueness
+	// Validate imports against allowlist (positive allowlist, default-deny)
+	if violations, err := ValidateImports(snapshot.GoSource); err != nil {
+		return nil, fmt.Errorf("import validation parse error: %w", err)
+	} else if len(violations) > 0 {
+		var paths []string
+		for _, v := range violations {
+			paths = append(paths, v.PackagePath)
+		}
+		return nil, fmt.Errorf("forbidden imports: %s", strings.Join(paths, ", "))
+	}
+
+	// Check ID uniqueness against registry
 	if _, err := registry.Get(snapshot.CheckID); err == nil {
 		return nil, fmt.Errorf("check ID %s already registered", snapshot.CheckID)
 	}
 
-	// Write snapshot to temp dir for go build/vet
-	tmpDir, err := os.MkdirTemp("", "doctrust-validate-*")
-	if err != nil {
-		return nil, fmt.Errorf("create temp dir: %w", err)
+	// Check ID uniqueness against all rulesets (deterministic iteration policy)
+	if rulesetsDir != "" {
+		if foundDomain, foundVersion, _ := CheckIDExistsInAnyRuleset(rulesetsDir, snapshot.CheckID); foundDomain != "" {
+			return nil, fmt.Errorf("check ID %s already exists in ruleset %s (version %s)", snapshot.CheckID, foundDomain, foundVersion)
+		}
 	}
-	defer os.RemoveAll(tmpDir)
 
-	if err := os.WriteFile(filepath.Join(tmpDir, "check.go"), snapshot.GoSource, 0644); err != nil {
+	// Build a real validation worktree with the full module graph so candidates
+	// importing github.com/doctrust/doctrust/internal/eval compile correctly.
+	repoRoot, modErr := FindModuleRoot()
+	if modErr != nil {
+		return nil, fmt.Errorf("resolve module root for validation environment: %w", modErr)
+	}
+
+	tmpWork, err := os.MkdirTemp(repoRoot, ".doctrust-validate-*")
+	if err != nil {
+		return nil, fmt.Errorf("create validation worktree: %w", err)
+	}
+	defer os.RemoveAll(tmpWork)
+
+	// Copy the real module tree (go.mod, go.sum, internal/**) verbatim — the
+	// module path and import graph must be identical to production.
+	if err := copyModuleTree(repoRoot, tmpWork); err != nil {
+		return nil, fmt.Errorf("copy module tree: %w", err)
+	}
+
+	// Nested-module tripwire: exactly one go.mod may exist after the copy.
+	nested, err := findNestedGoMod(tmpWork)
+	if err != nil {
+		return nil, fmt.Errorf("scan validation worktree: %w", err)
+	}
+	if nested != "" {
+		return nil, fmt.Errorf("validation worktree contains nested go.mod at %s; module graph would diverge from production", nested)
+	}
+
+	candidatePkg := filepath.Join(tmpWork, "candidate")
+	if err := os.MkdirAll(candidatePkg, 0755); err != nil {
+		return nil, fmt.Errorf("create candidate package dir: %w", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(candidatePkg, "check.go"), snapshot.GoSource, 0644); err != nil {
 		return nil, fmt.Errorf("write check.go to temp: %w", err)
 	}
 	// Write metadata and scenarios for package completeness (even if not used by build)
-	os.WriteFile(filepath.Join(tmpDir, "metadata.yaml"), snapshot.Metadata, 0644)
-	os.WriteFile(filepath.Join(tmpDir, "scenarios.yaml"), snapshot.Scenarios, 0644)
+	os.WriteFile(filepath.Join(candidatePkg, "metadata.yaml"), snapshot.Metadata, 0644)
+	os.WriteFile(filepath.Join(candidatePkg, "scenarios.yaml"), snapshot.Scenarios, 0644)
 	if len(snapshot.Adversarial) > 0 {
-		os.WriteFile(filepath.Join(tmpDir, "adversarial.yaml"), snapshot.Adversarial, 0644)
+		os.WriteFile(filepath.Join(candidatePkg, "adversarial.yaml"), snapshot.Adversarial, 0644)
 	}
 
-	// Go build
-	if err := runGoBuild(tmpDir); err != nil {
+	// Go build / vet — run inside the candidate package; module resolution walks
+	// up from cmd.Dir to tmpWork/go.mod, preserving the real import graph.
+	if err := runGoBuild(candidatePkg); err != nil {
 		result.Errors = append(result.Errors, fmt.Sprintf("go build: %v", err))
 		result.Failed++
 	} else {
@@ -135,7 +198,7 @@ func ValidateSnapshot(snapshot *CandidateSnapshot, registry *eval.CheckRegistry)
 	}
 
 	// Go vet
-	if err := runGoVet(tmpDir); err != nil {
+	if err := runGoVet(candidatePkg); err != nil {
 		result.Errors = append(result.Errors, fmt.Sprintf("go vet: %v", err))
 		result.Failed++
 	} else {
@@ -146,7 +209,53 @@ func ValidateSnapshot(snapshot *CandidateSnapshot, registry *eval.CheckRegistry)
 		return result, fmt.Errorf("candidate validation failed: %d errors", result.Failed)
 	}
 
+	// Dependency-graph assertion: the candidate's canonical import path must
+	// resolve against the real module. Guards against any future change that
+	// would silently let this gate "pass" against an altered temp module.
+	// A failed assertion COMMAND ITSELF is also a Gate 4 failure — the
+	// tripwire must never be waived exactly when the module graph misbehaves.
+	depsOut, depsErr := goListDeps(tmpWork)
+	if depsErr != nil {
+		result.Errors = append(result.Errors,
+			fmt.Sprintf("import-path assertion failed: go list -deps error: %v", depsErr))
+		result.Failed++
+		return result, fmt.Errorf("candidate validation failed: %d errors", result.Failed)
+	}
+	if !strings.Contains(string(depsOut), canonicalEvalImportPath) {
+		result.Errors = append(result.Errors,
+			fmt.Sprintf("import-path assertion failed: %s missing from dependency set (temp module diverged from production)", canonicalEvalImportPath))
+		result.Failed++
+		return result, fmt.Errorf("candidate validation failed: %d errors", result.Failed)
+	}
+
 	return result, nil
+}
+
+// goListDeps runs `go list -deps ./candidate/` inside dir. Package-level
+// variable to allow test injection for failure testing.
+var goListDeps = func(dir string) ([]byte, error) {
+	cmd := exec.Command("go", "list", "-deps", "./candidate/")
+	cmd.Dir = dir
+	return cmd.Output()
+}
+
+// canonicalEvalImportPath is the import path every conforming candidate uses.
+const canonicalEvalImportPath = "github.com/doctrust/doctrust/internal/eval"
+
+// findNestedGoMod returns the path of any go.mod under root that is not root's own.
+func findNestedGoMod(root string) (string, error) {
+	var found string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && info.Name() == "go.mod" && filepath.Dir(path) != root {
+			found = path
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	return found, err
 }
 
 // TransformCandidate uses AST to rewrite candidate package to eval package.
@@ -652,6 +761,140 @@ func ValidateTransformedArtifact() error {
 	return runGoBuildPackage("./internal/eval/...")
 }
 
+// copyModuleTree copies the entire Go module tree: go.mod, go.sum, and all
+// internal/ packages including internal/eval/. The caller is responsible for
+// replacing internal/eval/ with staged files afterward.
+func copyModuleTree(src, dst string) error {
+	// Required top-level files
+	for _, f := range []string{"go.mod", "go.sum"} {
+		srcPath := filepath.Join(src, f)
+		dstPath := filepath.Join(dst, f)
+		if _, err := os.Stat(srcPath); err == nil {
+			if err := copyFileFn(srcPath, dstPath); err != nil {
+				return fmt.Errorf("copy %s: %w", f, err)
+			}
+		}
+	}
+
+	// Copy all internal/ packages
+	internalSrc := filepath.Join(src, "internal")
+	internalDst := filepath.Join(dst, "internal")
+	if _, err := os.Stat(internalSrc); err == nil {
+		if err := copyDirFn(internalSrc, internalDst); err != nil {
+			return fmt.Errorf("copy internal/: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// ValidateStagedArtifact creates a temporary module worktree with the full Go
+// module graph, then overlays the staged transformed files onto internal/eval/.
+// This verifies the transformed artifact compiles against the real eval types
+// (Facts, Result, Check, etc.) BEFORE any trusted tree mutation.
+func ValidateStagedArtifact(stagingDir, evalDir, repoRoot string) error {
+	// Create temp dir under repo root (so go.mod is discoverable)
+	tmpWork, err := os.MkdirTemp(repoRoot, ".doctrust-staged-*")
+	if err != nil {
+		return fmt.Errorf("create staged worktree: %w", err)
+	}
+	defer os.RemoveAll(tmpWork)
+
+	// Copy the full module tree (including real internal/eval/ with all types)
+	if err := copyModuleTree(repoRoot, tmpWork); err != nil {
+		return fmt.Errorf("copy module tree: %w", err)
+	}
+
+	// Overlay staged files on top of the real internal/eval/.
+	// This adds the new check file and updated checks.go while preserving
+	// the existing eval types that the candidate depends on.
+	// Skip candidate_check.go (untransformed original with wrong package name).
+	stagedEvalDir := filepath.Join(tmpWork, "internal", "eval")
+	if err := filepath.Walk(stagingDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(stagingDir, path)
+		if err != nil {
+			return err
+		}
+		// Skip untransformed candidate source (wrong package declaration)
+		if !info.IsDir() && strings.HasPrefix(info.Name(), "candidate_") {
+			return nil
+		}
+		dst := filepath.Join(stagedEvalDir, rel)
+		if info.IsDir() {
+			return os.MkdirAll(dst, 0755)
+		}
+		return copyFileFn(path, dst)
+	}); err != nil {
+		return fmt.Errorf("overlay staged files: %w", err)
+	}
+
+	// Compile the staged module tree from within the worktree
+	cmd := exec.Command("go", "build", "./internal/eval/...")
+	cmd.Dir = tmpWork
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("staged build failed: %s", string(output))
+	}
+
+	return nil
+}
+
+// RunStagedRegression runs the full regression suite against the staged working
+// ruleset and the existing scenario corpus. This proves that:
+// 1. The new check's scenarios pass
+// 2. Existing regression scenarios still pass with the new check added
+// 3. No regressions were introduced
+func RunStagedRegression(stagingDir, evalDir, domain, scenariosDir string) error {
+	// Load the staged working ruleset (from the staging dir, not trusted tree)
+	stagedWorkingPath := filepath.Join(stagingDir, "working.yaml")
+	rs, err := eval.LoadRuleset(stagedWorkingPath)
+	if err != nil {
+		return fmt.Errorf("load staged ruleset: %w", err)
+	}
+
+	// Load checks from the eval registry
+	registry := eval.DefaultRegistry()
+	checks := registry.All()
+
+	// Load scenarios from the existing corpus
+	corpusDir := filepath.Join(scenariosDir, domain)
+	scenarios, err := eval.LoadAllScenariosFromDir(corpusDir)
+	if err != nil {
+		return fmt.Errorf("load scenarios: %w", err)
+	}
+	if len(scenarios) == 0 {
+		return nil // no scenarios to run
+	}
+
+	// Build runner with the staged ruleset's checks
+	runner := eval.NewRunner(checks)
+
+	// Run all scenarios against the staged ruleset
+	ctx := context.Background()
+	var failures []string
+	for _, s := range scenarios {
+		// Resolve params with the SAME production semantics as cmd/regression.
+		params := ResolveRulesetParams(rs, s.Expected.CheckID, s.Params)
+		sWithParams := s
+		sWithParams.Params = params
+		result := runner.RunScenario(ctx, sWithParams)
+		if !result.Passed {
+			failures = append(failures, fmt.Sprintf("%s: expected %s/%s, got %s/%s",
+				s.Name, s.Expected.Status, s.Expected.Severity,
+				result.Actual.Status, result.Actual.Severity))
+		}
+	}
+
+	if len(failures) > 0 {
+		return fmt.Errorf("staged regression failed: %d failures:\n%s", len(failures), strings.Join(failures, "\n"))
+	}
+
+	return nil
+}
+
 // StagePromotion stages all changes in temp dir for atomic commit.
 // Uses snapshot bytes — never re-reads the candidate directory.
 func StagePromotion(snapshot *CandidateSnapshot, evalDir, domain, rulesetsDir string) (string, error) {
@@ -683,11 +926,44 @@ func StagePromotion(snapshot *CandidateSnapshot, evalDir, domain, rulesetsDir st
 		return "", fmt.Errorf("copy checks.go: %w", err)
 	}
 
-	// AST-insert registration
-	typeName := toTypeName(snapshot.CheckID)
+	// AST-insert registration under the author's ACTUAL struct name.
+	// Never derive the symbol from check_id — natural LLM output owes nothing
+	// to any naming convention, and execution (Gate 5) already adapts to
+	// whatever struct the candidate declares. Registration must agree with it.
+	typeName, err := extractCheckStructName(string(snapshot.GoSource))
+	if err != nil {
+		os.RemoveAll(tmpDir)
+		return "", fmt.Errorf("extract check struct name: %w", err)
+	}
 	if err := InsertCheckRegistration(checksGoDst, typeName); err != nil {
 		os.RemoveAll(tmpDir)
 		return "", fmt.Errorf("insert registration: %w", err)
+	}
+
+	// Build the staged working ruleset from the CURRENT ruleset (working draft,
+	// else latest promoted) plus the new CheckRef — identical construction to
+	// production promotion (addCheckRefToRuleset). This preserves existing
+	// CheckRefs and their Params so staged regression parameter resolution
+	// matches post-promotion regression exactly.
+	reg := eval.NewRegistry(rulesetsDir)
+	stagedRS, wsErr := reg.LoadWorking(domain)
+	if wsErr != nil || stagedRS.Version == "draft" {
+		stagedRS, wsErr = reg.LoadPromoted(domain)
+		if wsErr != nil {
+			os.RemoveAll(tmpDir)
+			return "", fmt.Errorf("no ruleset found for domain %s: %w", domain, wsErr)
+		}
+		stagedRS.Version = "draft"
+	}
+	stagedRS = applyCheckRef(stagedRS, snapshot.CheckID, snapshot.Version, snapshot.Parameters)
+	stagedYAML, mErr := yaml.Marshal(stagedRS)
+	if mErr != nil {
+		os.RemoveAll(tmpDir)
+		return "", fmt.Errorf("marshal staged working.yaml: %w", mErr)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "working.yaml"), stagedYAML, 0644); err != nil {
+		os.RemoveAll(tmpDir)
+		return "", fmt.Errorf("write staged working.yaml: %w", err)
 	}
 
 	return tmpDir, nil
@@ -696,7 +972,8 @@ func StagePromotion(snapshot *CandidateSnapshot, evalDir, domain, rulesetsDir st
 // CommitPromotion atomically moves staged artifacts to trusted locations.
 // The Ruleset YAML is part of the same backup/rollback transaction as the trusted tree.
 // Invariant: a failed promotion leaves ALL trusted state (check, registry, Ruleset) unchanged.
-func CommitPromotion(stagingDir, evalDir, domain, rulesetsDir string, snapshot *CandidateSnapshot) error {
+// scenariosRoot is the repo-relative scenarios/ directory (e.g. "<repo>/scenarios").
+func CommitPromotion(stagingDir, evalDir, domain, rulesetsDir, scenariosRoot string, snapshot *CandidateSnapshot) error {
 	// Paths we will modify
 	checkDst := filepath.Join(evalDir, fmt.Sprintf("check_%s.go", snapshot.CheckID))
 	checksDst := filepath.Join(evalDir, "checks.go")
@@ -734,7 +1011,7 @@ func CommitPromotion(stagingDir, evalDir, domain, rulesetsDir string, snapshot *
 
 	// Phase 1: Ruleset update (FIRST — before any trusted tree mutation)
 	// Failure is fatal — nothing has been written yet.
-	if err := addCheckRefFn(rulesetsDir, domain, snapshot.CheckID, snapshot.Version); err != nil {
+	if err := addCheckRefFn(rulesetsDir, domain, snapshot.CheckID, snapshot.Version, snapshot.Parameters); err != nil {
 		return fmt.Errorf("update Ruleset: %w", err)
 	}
 
@@ -761,13 +1038,55 @@ func CommitPromotion(stagingDir, evalDir, domain, rulesetsDir string, snapshot *
 		return fmt.Errorf("write checks.go: %w", err)
 	}
 
-	// Phase 4: Archive candidate (validate archive parent is safe)
+	// Phase 5: Merge candidate scenarios into regression corpus
+	// This adds the candidate's validated scenarios to the persistent regression corpus
+	// so they participate in subsequent bin/regression runs.
+	scenariosDir := filepath.Join(scenariosRoot, domain)
+	backupScenariosDir := filepath.Join(backupDir, "scenarios")
+	mergedScenarioPath := filepath.Join(scenariosDir, fmt.Sprintf("check_%s.yaml", snapshot.CheckID))
+	backupScenarioPath := filepath.Join(backupScenariosDir, fmt.Sprintf("check_%s.yaml", snapshot.CheckID))
+
+	// Backup existing scenario file if it exists
+	if _, statErr := os.Stat(mergedScenarioPath); statErr == nil {
+		os.MkdirAll(backupScenariosDir, 0755)
+		if err := copyFileFn(mergedScenarioPath, backupScenarioPath); err != nil {
+			rbErrs := errors.Join(
+				restoreOrRemove(backupCheck, checkDst),
+				restoreOrRemove(backupChecks, checksDst),
+				restoreOrRemove(backupWorking, workingYaml),
+			)
+			if rbErrs != nil {
+				return errors.Join(fmt.Errorf("backup scenario file: %w", err), fmt.Errorf("rollback: %w", rbErrs))
+			}
+			return fmt.Errorf("backup scenario file: %w", err)
+		}
+	}
+
+	if err := mergeCandidateScenarios(snapshot, scenariosDir); err != nil {
+		// Rollback scenario file
+		rbScenario := restoreOrRemove(backupScenarioPath, mergedScenarioPath)
+		rbErrs := errors.Join(
+			restoreOrRemove(backupCheck, checkDst),
+			restoreOrRemove(backupChecks, checksDst),
+			restoreOrRemove(backupWorking, workingYaml),
+		)
+		if rbScenario != nil {
+			rbErrs = errors.Join(rbErrs, rbScenario)
+		}
+		if rbErrs != nil {
+			return errors.Join(fmt.Errorf("merge scenarios: %w", err), fmt.Errorf("rollback: %w", rbErrs))
+		}
+		return fmt.Errorf("merge scenarios: %w", err)
+	}
+
+	// Phase 6: Archive candidate (validate archive parent is safe)
 	archivePath, err := ValidateArchivePath(filepath.Dir(snapshot.Dir), snapshot.CheckID)
 	if err != nil {
 		rbErrs := errors.Join(
 			restoreOrRemove(backupCheck, checkDst),
 			restoreOrRemove(backupChecks, checksDst),
 			restoreOrRemove(backupWorking, workingYaml),
+			restoreOrRemove(backupScenarioPath, mergedScenarioPath),
 		)
 		if rbErrs != nil {
 			return errors.Join(fmt.Errorf("validate archive path: %w", err), fmt.Errorf("rollback: %w", rbErrs))
@@ -779,6 +1098,7 @@ func CommitPromotion(stagingDir, evalDir, domain, rulesetsDir string, snapshot *
 			restoreOrRemove(backupCheck, checkDst),
 			restoreOrRemove(backupChecks, checksDst),
 			restoreOrRemove(backupWorking, workingYaml),
+			restoreOrRemove(backupScenarioPath, mergedScenarioPath),
 		)
 		if rbErrs != nil {
 			return errors.Join(fmt.Errorf("create archive dir: %w", err), fmt.Errorf("rollback: %w", rbErrs))
@@ -790,6 +1110,7 @@ func CommitPromotion(stagingDir, evalDir, domain, rulesetsDir string, snapshot *
 			restoreOrRemove(backupCheck, checkDst),
 			restoreOrRemove(backupChecks, checksDst),
 			restoreOrRemove(backupWorking, workingYaml),
+			restoreOrRemove(backupScenarioPath, mergedScenarioPath),
 		)
 		if rbErrs != nil {
 			return errors.Join(fmt.Errorf("archive candidate: %w", err), fmt.Errorf("rollback: %w", rbErrs))
@@ -797,12 +1118,12 @@ func CommitPromotion(stagingDir, evalDir, domain, rulesetsDir string, snapshot *
 		return fmt.Errorf("archive candidate: %w", err)
 	}
 
-	// Phase 5: Remove active candidate (non-fatal)
+	// Phase 7: Remove active candidate (non-fatal)
 	if err := os.RemoveAll(snapshot.Dir); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not remove candidate dir: %v\n", err)
 	}
 
-	// Phase 6: Set state to promoted
+	// Phase 8: Set state to promoted
 	SetState(archivePath, StatePromoted)
 
 	return nil
@@ -821,11 +1142,49 @@ func restoreOrRemove(backupPath, target string) error {
 	return nil
 }
 
+// mergeCandidateScenarios copies the candidate's validated scenarios and adversarial
+// scenarios into the regression corpus directory. The merged file is named after
+// the check ID and includes provenance metadata.
+func mergeCandidateScenarios(snapshot *CandidateSnapshot, scenariosDir string) error {
+	if err := os.MkdirAll(scenariosDir, 0755); err != nil {
+		return fmt.Errorf("create scenarios dir: %w", err)
+	}
+
+	// Parse scenarios from snapshot
+	scenarios, err := parseCandidateScenarios(snapshot)
+	if err != nil {
+		return fmt.Errorf("parse candidate scenarios: %w", err)
+	}
+	if len(scenarios) == 0 {
+		return nil
+	}
+
+	// Write as a single YAML file named after the check
+	outPath := filepath.Join(scenariosDir, fmt.Sprintf("check_%s.yaml", snapshot.CheckID))
+
+	// Build the YAML output with provenance wrapper
+	var buf bytes.Buffer
+	buf.WriteString("# Auto-generated by promotion of check_id: ")
+	buf.WriteString(snapshot.CheckID)
+	buf.WriteString(" version: ")
+	buf.WriteString(snapshot.Version)
+	buf.WriteString("\n# DO NOT EDIT — this file is managed by the promotion pipeline.\n\n")
+
+	scenariosBytes, err := yaml.Marshal(map[string]any{"scenarios": scenarios})
+	if err != nil {
+		return fmt.Errorf("marshal scenarios: %w", err)
+	}
+	buf.Write(scenariosBytes)
+
+	return os.WriteFile(outPath, buf.Bytes(), 0644)
+}
+
 // addCheckRefToRuleset loads the working ruleset for the domain, adds a CheckRef
 // for the newly promoted check, and saves it back. Creates working.yaml from the
 // latest promoted version if no working draft exists.
 // If the CheckID already exists, replaces its version (one authoritative version per Check).
-func addCheckRefToRuleset(rulesetsDir, domain, checkID, version string) error {
+// The params parameter carries approved metadata parameters into the Ruleset CheckRef.
+func addCheckRefToRuleset(rulesetsDir, domain, checkID, version string, params map[string]any) error {
 	registry := eval.NewRegistry(rulesetsDir)
 
 	// Try to load working draft
@@ -839,22 +1198,30 @@ func addCheckRefToRuleset(rulesetsDir, domain, checkID, version string) error {
 		rs.Version = "draft"
 	}
 
-	// Check if already present — replace version if CheckID exists
-	for i, ref := range rs.Checks {
-		if ref.ID == checkID {
-			rs.Checks[i].Version = version
-			return registry.SaveWorking(rs)
-		}
-	}
-
-	// Add the new CheckRef
-	rs.Checks = append(rs.Checks, eval.CheckRef{
-		ID:      checkID,
-		Version: version,
-	})
+	rs = applyCheckRef(rs, checkID, version, params)
 
 	// Save working draft
 	return registry.SaveWorking(rs)
+}
+
+// applyCheckRef returns rs with the CheckRef for checkID replaced (if present)
+// or appended. PURE function — no I/O. Shared by production promotion
+// (addCheckRefToRuleset) and staged-ruleset construction (StagePromotion) so
+// both produce identical Ruleset semantics.
+func applyCheckRef(rs eval.Ruleset, checkID, version string, params map[string]any) eval.Ruleset {
+	for i := range rs.Checks {
+		if rs.Checks[i].ID == checkID {
+			rs.Checks[i].Version = version
+			rs.Checks[i].Params = params
+			return rs
+		}
+	}
+	rs.Checks = append(rs.Checks, eval.CheckRef{
+		ID:      checkID,
+		Version: version,
+		Params:  params,
+	})
+	return rs
 }
 
 // RollbackPromotion removes staged artifacts on failure.
@@ -862,13 +1229,42 @@ func RollbackPromotion(stagingDir string) error {
 	return os.RemoveAll(stagingDir)
 }
 
-// toTypeName converts a snake_case check ID to a PascalCase Go type name.
-func toTypeName(checkID string) string {
-	parts := strings.Split(checkID, "_")
-	for i := range parts {
-		parts[i] = strings.Title(parts[i])
+// CheckIDExistsInAnyRuleset scans all promoted and working rulesets for the given check ID.
+// Returns the domain and version where it was found, or empty strings if not found.
+func CheckIDExistsInAnyRuleset(rulesetsDir, checkID string) (domain, version string, err error) {
+	entries, err := os.ReadDir(rulesetsDir)
+	if err != nil {
+		return "", "", fmt.Errorf("read rulesets dir: %w", err)
 	}
-	return strings.Join(parts, "") + "Check"
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		reg := eval.NewRegistry(rulesetsDir)
+
+		// Check promoted versions
+		rs, err := reg.LoadPromoted(entry.Name())
+		if err == nil {
+			for _, ref := range rs.Checks {
+				if ref.ID == checkID {
+					return entry.Name(), rs.Version, nil
+				}
+			}
+		}
+
+		// Check working draft
+		working, err := reg.LoadWorking(entry.Name())
+		if err == nil && working.Checks != nil {
+			for _, ref := range working.Checks {
+				if ref.ID == checkID {
+					return entry.Name(), working.Version, nil
+				}
+			}
+		}
+	}
+
+	return "", "", nil
 }
 
 // copyFile copies a file from src to dst.

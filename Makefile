@@ -1,4 +1,4 @@
-.PHONY: build run test ingest clean setup demo-pdfs check-policy test-policy validate-fixtures eval compile-policy test-compiler server regression promote registry mcp
+.PHONY: build run test ingest clean setup demo-pdfs check-policy test-policy validate-fixtures eval compile-policy test-compiler server regression promote registry mcp author-check review-check promote-check verify-ruleset
 
 # Build all binaries
 build:
@@ -10,6 +10,10 @@ build:
 	go build -o bin/regression ./cmd/regression/
 	go build -o bin/promote ./cmd/promote/
 	go build -o bin/registry ./cmd/registry/
+	go build -o bin/author-check ./cmd/author-check/
+	go build -o bin/review-check ./cmd/review-check/
+	go build -o bin/promote-check ./cmd/promote-check/
+	go build -o bin/verify-ruleset ./cmd/verify-ruleset/
 
 # Run the ingest pipeline on demo documents
 run: build
@@ -78,6 +82,20 @@ registry: build
 # Show registry for specific domain
 registry-domain: build
 	bin/registry --domain income_verification
+
+# === Phase 3: candidate check lifecycle ===
+
+# Review a candidate interactively (approve/reject/edit)
+review-candidate: build
+	bin/review-check $(CANDIDATE)
+
+# Full promotion pipeline for an approved candidate (all trust gates)
+promote-candidate: build
+	bin/promote-check --candidate $(CANDIDATE) --domain $(DOMAIN)
+
+# Verify promoted ruleset integrity
+verify-ruleset: build
+	bin/verify-ruleset --domain $(DOMAIN)
 
 # Build MCP stdio server
 mcp: build
