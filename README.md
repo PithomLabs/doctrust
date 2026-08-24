@@ -2,12 +2,38 @@
 
 Nutrient extraction → frozen evidence → deterministic evaluation → human review → audit artifact.
 AI-authored rules enter through a human-gated trust funnel before reaching the runtime.
+The agent-facing runtime ships as MCP tools (`doctrust-mcp` · `evidence-mcp`),
+operated by AI agents (Hermes or any MCP-capable harness) under a compliance skill:
+**the agent investigates; DocTrust enforces the approved policy.**
 
 **Demo target:** September 4, 2026
 
 ---
 
 ## Architecture
+
+Two live compliance domains ship today: `income_verification` (authoring
+reference corpus) and `shipment_release` (live demo on the frozen Shipment-1047
+PDF fixtures).
+
+Canonical agent-side interaction (verified end-to-end in Phase 5):
+
+```
+END USER
+    ↓  "Do these shipment PDFs pass the release policy?"
+HERMES / AI AGENT   — runs the compliance-check-artifact skill
+    ├──► evidence-mcp ──► Nutrient DWS ──► normalized evidence snapshot
+    │        (progressive: only available documents are submitted;
+    │         missing required documents surface at evaluation)
+    └──► doctrust-mcp ──► deterministic Ruleset evaluation
+                              ↓
+                     PASS / REVIEW / FAIL  (+ structured findings,
+                     page/bbox provenance, case/audit IDs)
+    ↓
+REVIEW escalates to human authority · audit artifact sealed
+```
+
+Authoring path (how check logic enters the trusted tree):
 
 ```
 OpenRouter author-check generates a candidate check
@@ -66,6 +92,10 @@ Signed PDF report (cryptographic binding)
 - **AST-name registration**: promoted checks register under the struct name the author actually wrote — no naming convention is imposed
 - **Staged ≡ production**: one parameter resolver (`compiler.ResolveRulesetParams`) feeds both staged regression and production regression
 - **Trusted-tree immutability**: any gate failure leaves eval/rulesets/scenarios byte-for-byte unchanged
+- **Provider seam**: `internal/provider.EvidenceProvider` is the generic extraction contract; consumers are the ingest path only (`cmd/ingest`, `cmd/evidence-mcp`)
+- **Skill canonical/derived contract**: `skills/<name>/SKILL.md` is the source of truth; the `~/.hermes` copy deploys solely via `scripts/install-skill.sh`
+- **Secrets stay out of MCP config**: provider credentials resolve from the process environment or an `--env-file` PATH at runtime
+- **Rehearsal availability is filesystem-gated**: withheld documents live outside `DOCTRUST_SNAPSHOT_ROOT` until chosen; prompt-only unavailability is forbidden
 
 ---
 
@@ -87,6 +117,28 @@ make promote
 # Inspect registry state
 make registry
 ```
+
+### Shipment release — live demo path (Phase 5)
+
+```bash
+make build                                   # 13 binaries incl. evidence-mcp
+
+./scripts/install-skill.sh                   # deploy Compliance Skill to Hermes
+hermes mcp add doctrust --command "$PWD/bin/doctrust-mcp" \
+    --args --domain shipment_release --rulesets-dir "$PWD/rulesets" --snapshot-root "$PWD/demo/shipment_release"
+hermes mcp add evidence --command "$PWD/bin/evidence-mcp" \
+    --args --snapshot-root "$PWD/demo/shipment_release" --env-file "$PWD/.env"
+
+bin/ingest -domain shipment_release \
+    -docs "commercial_invoice=<pdf>,packing_list=<pdf>,bill_of_lading=<pdf>,certificate_of_origin=<pdf>" \
+    -report g1/extraction_report.json
+
+./scripts/rehearse-hermes-shipment.sh        # real adaptive Hermes run + assertions A1–A10b
+./scripts/failure-rehearsals.sh              # trust-boundary failure rehearsals F1–F5
+```
+
+Reports: `g1/G1_REPORT.md` (live extraction proof) ·
+`phase5/PHASE5_REPORT.md` (adaptive orchestration).
 
 ### Author a new check through the trust funnel
 
@@ -121,7 +173,11 @@ doctrust/
     promote/                    # Ruleset promotion (Phase 2)
     registry/                   # Registry inspection (Phase 2)
     server/                     # HTTP API (Phase 4)
-    doctrust-mcp/               # MCP stdio server (evaluate_case)
+    doctrust-mcp/               # MCP stdio server — 6 tools: evaluate_case,
+                                #   get_findings, get_evidence, get_ruleset,
+                                #   request_human_review, get_audit_artifact
+    evidence-mcp/               # MCP stdio provider adapter (thin): builds/
+                                #   extends evidence snapshots via ingest path
     eval/                       # OPA standalone evaluator (reference)
     compare/                    # OPA vs eval cross-validation (reference)
     validate-fixtures/          # OPA fixture validation (reference)
@@ -141,18 +197,24 @@ doctrust/
     nutrient/                   # Nutrient DWS client
     audit/                      # Audit artifact + PDF report
     review/                     # Human review store + disposition
-    extraction/                 # Extraction config (shared)
-  rulesets/                     # Ruleset registry (versioned)
+    extraction/                 # Extraction config (shared; income + shipment)
+    provider/                   # Provider-neutral EvidenceProvider seam
+  skills/                       # PRODUCT ARTIFACT: agent skills (canonical)
+    compliance-check-artifact/SKILL.md
+  rulesets/                     # Ruleset registry (versioned, immutable once promoted)
     income_verification/
-      v1.yaml                   # Promoted v1 (tolerance=5%)
-      v1.manifest.json          # SHA-256 hash + timestamp
-      v2.yaml                   # Promoted v2 (tolerance=3%)
-      v2.manifest.json
+      v1.yaml / v1.manifest.json
+      v2.yaml / v2.manifest.json
+    shipment_release/
+      v1.yaml                   # required_shipment_documents +
+      v1.manifest.json          #   gross_weight_reconciliation (live demo)
   scenarios/                    # Regression corpus — promotions merge new check
     income_verification/        # scenarios here; production loaders read this dir
       check_gross_income_variance.yaml  (6 scenarios)
       check_required_docs.yaml          (5 scenarios)
       check_net_vs_gross.yaml           (3 scenarios)
+    shipment_release/           # 6 scenarios (pass / B/L outlier REVIEW /
+      check_shipment_release.yaml  #  partial-insufficient / conflicting / …)
   candidates/                   # Authoring workspace (created by author-check)
     active/<check_id>/          # check.go, metadata.yaml, scenarios.yaml,
       adversarial.yaml, state, approval.json
@@ -180,13 +242,20 @@ type Check interface {
 }
 ```
 
-**Three registered checks:**
+**Five registered checks:**
 
 | Check ID | Purpose | Key Params |
 |----------|---------|------------|
 | `gross_income_consistency` | Compares paystub projected gross vs W-2 taxable income | `tolerance` (default 5%), `bonus_field` |
-| `required_documents` | Verifies all required document types are present | none |
+| `required_documents` | Verifies all required document types are present (income domain) | none |
 | `net_vs_gross_incomparability` | Semantic guard: net cash flow ≠ gross taxable income | none |
+| `gross_weight_reconciliation` | Shipment gross weight must agree (`all_equal`) across required trade documents; missing sources → REVIEW (insufficient evidence); mismatch → REVIEW naming outliers | `semantic_type`, `sources`, `condition`, `unit`, `tolerance` (default 0.005) |
+| `required_shipment_documents` | Verifies the four trade-document types are present; missing → REVIEW/BLOCKING (never FAIL — progressive-evidence dependency) | `required` (list of document types) |
+
+Trade documents: `commercial_invoice`, `packing_list`, `bill_of_lading`,
+`certificate_of_origin`. All four expose their gross weight under the shared
+semantic type `shipment.gross_weight`; identity references and container/seal
+are captured per document for corroboration.
 
 ### Ruleset
 
@@ -382,7 +451,13 @@ allowlisted packages (`fmt`, `math`, `sort`, `strconv`, `strings`, `time`,
 | `bin/registry` | List all rulesets with versions |
 | `bin/registry --domain <domain>` | Show details for one ruleset |
 | `bin/server --domain <domain>` | HTTP API server |
-| `bin/doctrust-mcp [--rulesets-dir D] [--snapshot-root D]` | MCP stdio server exposing evaluate_case |
+| `bin/doctrust-mcp --domain <domain> [--rulesets-dir D] [--snapshot-root D]` | MCP stdio server (6 tools: evaluate_case, get_findings, get_evidence, get_ruleset, request_human_review, get_audit_artifact) |
+| `bin/evidence-mcp [--snapshot-root D] [--env-file F]` | MCP stdio provider adapter: build_evidence_snapshot / extend_evidence_snapshot (credentials load at runtime from env or .env file — never stored in agent config) |
+| `bin/ingest <dir>` | Income-domain extraction pipeline (legacy positional mode) |
+| `bin/ingest -domain shipment_release -docs type=path[,…] [--extend-from S] [--report F]` | Shipment evidence pipeline; extension produces a new content-derived case + provenance sidecar |
+| `scripts/rehearse-hermes-shipment.sh` | Real adaptive Hermes run + assertions A1–A10b |
+| `scripts/failure-rehearsals.sh` | Trust-boundary failure rehearsals F1–F5 |
+| `scripts/install-skill.sh` | Deploy canonical Compliance Skill to the Hermes runtime |
 | `bin/eval --policy <path> <snapshot>` | OPA standalone evaluator (reference) |
 | `bin/compare <snapshot>` | Cross-validate OPA vs eval engine (reference) |
 
@@ -400,11 +475,16 @@ go vet ./...                                            # must be clean
 go test ./...                                           # all tests pass
 go test -race ./...                                     # race detector
 go test ./internal/eval/... -v -run TestRunAllScenarios # 14/14 strict
+go test ./internal/eval/... -v -run TestRunAllShipmentScenarios # 6/6 shipment scenarios
 go test ./internal/service/... -v                       # service layer tests
 go test ./internal/audit/... -v -run TestArtifact       # artifact hash integrity
 bin/regression --domain income_verification             # baseline = 0 changed
 bin/registry                                            # shows all versions
 make lint-imports                                       # provider boundary check
+
+# Phase 5 — agent orchestration
+./scripts/rehearse-hermes-shipment.sh                   # live adaptive run + A1–A10b
+./scripts/failure-rehearsals.sh                         # F1–F5 fail-closed proofs
 
 # Candidate lifecycle suites (trust funnel)
 go test ./internal/compiler/...                         # gates, staged build/regression, E2E + failure paths
@@ -440,6 +520,34 @@ go test ./cmd/verify-ruleset/...                        # version/hash assertion
 | Phase 2 | Frozen | Regression CLI, promote CLI, registry CLI, Ruleset params default |
 | Phase 3 | Frozen | Candidate Authoring & Trust Funnel — AI-generated candidate → human adversarial review → deterministic execution → staged build/regression → atomic promotion → durable regression coverage → verified runtime Ruleset → MCP/agent evaluation |
 | Phase 4 | Frozen | Enriched evaluation UI, audit artifact with ruleset provenance, bbox grounding, server trust tests |
+| Shipment evidence pipeline (plans10) | COMPLETE | Provider seam (`internal/provider`), shipment domain + promoted Ruleset v1, thin evidence-mcp, **G1 gate passed**: live Nutrient extraction matched ground truth 14/14 with page/bbox provenance — see [g1/G1_REPORT.md](g1/G1_REPORT.md) |
+| Agent orchestration & Compliance Skill (plans11 / Phase 5) | COMPLETE | Canonical skill + Hermes registrations + genuine adaptive investigation on live evidence; 13/13 assertions, F1–F5 rehearsals green — see [phase5/PHASE5_REPORT.md](phase5/PHASE5_REPORT.md) |
+
+---
+
+## Known Limitations & Deferred Items
+
+Verified-state documentation — what the current proof covers and where it ends:
+
+- **Review store is in-memory, single-case-per-process.** Human reviews and
+  audit artifacts are not persisted across process restarts; the demo
+  finalizes within one session.
+- **`request_human_review` caller authentication is deferred to Phase 6.**
+  The tool exists on the frozen MCP surface; Phase-5 enforcement is the skill's
+  forbidden action + transcript assertions + audit verification (zero
+  HumanReviewRecords after agent-only runs).
+- **Vestigial `MISSING_EVIDENCE`** exists only in the legacy Rego reference
+  path; the Go engine uses PASS/REVIEW/FAIL exclusively.
+- **Empty scaffolds**: `internal/policy/`, `internal/server/`,
+  `internal/workflow/` are reserved but unbuilt; orphaned root binaries
+  (`test_nutrient`, etc.) and the `cmd/inspect` debug CLI await cleanup.
+- **Evidence contract scope**: shipment extraction currently requests gross
+  weights + document references + container/seal (14 ground-truth-covered
+  fields). Full-document field coverage (line items, crate cells, party
+  blocks) is future work.
+- **Agent runs depend on free-tier model availability**
+  (`nvidia/nemotron-3-ultra-550b-a55b:free`); unavailability is reported as an
+  honest infrastructure failure, never silently substituted.
 
 ---
 

@@ -37,6 +37,12 @@ These are frozen. Do not modify, reinterpret, or "improve" them.
 
 ## Canonical Flow
 
+Upstream of the engine (agent side, plans10/11): an AI agent running the
+`compliance-check-artifact` skill obtains evidence through `evidence-mcp`
+(→ ingest → Nutrient), producing the `evidence_snapshot.json` consumed below.
+The agent never constructs facts itself; raw provider output is normalized
+inside the trusted ingest path.
+
 ```
 ScenarioFact (YAML-only)
     ↓ ScenarioInputToFacts()
@@ -60,11 +66,15 @@ Final decision (PASS | REVIEW | FAIL)
 type DocumentType string
 
 const (
-    DocTypePaystub  DocumentType = "paystub"
-    DocTypeW2       DocumentType = "w2"
-    DocType1040     DocumentType = "form_1040"
-    DocTypeBankStmt DocumentType = "bank_statement"
-    DocTypeUnknown  DocumentType = "unknown"
+    DocTypePaystub             DocumentType = "paystub"
+    DocTypeW2                  DocumentType = "w2"
+    DocType1040                DocumentType = "form_1040"
+    DocTypeBankStmt            DocumentType = "bank_statement"
+    DocTypeUnknown             DocumentType = "unknown"
+    DocTypeCommercialInvoice   DocumentType = "commercial_invoice"
+    DocTypePackingList         DocumentType = "packing_list"
+    DocTypeBillOfLading        DocumentType = "bill_of_lading"
+    DocTypeCertificateOfOrigin DocumentType = "certificate_of_origin"
 )
 
 // EvidenceRef is the pointer from a check result back to source evidence.
@@ -512,6 +522,8 @@ Ruleset-only changes need relaunch only.
 | `OPENROUTER_API_KEY` | authoring only | required by author-check; fails closed |
 | `OPENROUTER_MODEL` | authoring only | optional model override (default claude-sonnet-4) |
 | `DOCTRUST_REVIEWER` | review only | overrides OS username recorded as reviewer |
+| `NUTRIENT_DWS_EXTRACTION_API_KEY` | ingest / evidence-mcp | Nutrient extraction credential; resolves from process env or `.env` via evidence-mcp `--env-file` (P5-7: never persisted into MCP registration config) |
+| `DOCTRUST_SNAPSHOT_ROOT` | doctrust-mcp / evidence-mcp | allowed root for snapshot/document paths (path jail) |
 
 ### Frozen vs deferred (post-adv_review4)
 
@@ -521,6 +533,13 @@ README (P2-C closed); draft-sentinel ambiguity (P2-D); exact executed-count ==
 expected-count (P2-E); auto manifest cross-check (P2-F); param shadowing cleanup
 (P2-G); first-exported-struct selection (P2-H); orphaned temp worktrees on SIGKILL
 (P2-I); Makefile verify convenience flags (P2-J).
+
+Phase-6 deferred items (planned, NOT committed — do not present as shipped):
+caller-authenticated human-only channel for `request_human_review`;
+persistence of reviews/artifacts beyond a single case lifetime; multi-case
+service operation; broader shipment evidence-contract field coverage beyond
+gross weights + references + container/seal. See
+`phase5/PHASE5_REPORT.md` Limitations.
 
 ---
 
@@ -555,6 +574,10 @@ These are violations. Do not do them.
 - ❌ Importing non-allowlisted packages in candidate Go source
 - ❌ Treating a `go list -deps` error as a pass in Gate 4
 - ❌ Running verify-ruleset or the runtime without rebuilding after promoting a new Go check
+- ❌ Importing `internal/provider` from `internal/service` or `cmd/doctrust-mcp`
+- ❌ Persisting provider credentials into MCP registration configuration
+- ❌ Editing the derived Hermes skill copy independently of the canonical source
+- ❌ Simulating evidence availability in rehearsals instead of real filesystem gating
 
 ---
 
@@ -570,6 +593,9 @@ go test ./...
 
 # 14/14 strict scenario regression
 go test ./internal/eval/... -v -run TestRunAllScenarios
+
+# 6/6 shipment scenarios (shipment_release domain)
+go test ./internal/eval/... -v -run TestRunAllShipmentScenarios
 
 # Regression (ruleset params, the default)
 bin/regression --domain income_verification
@@ -629,6 +655,51 @@ go test ./cmd/server/... -v -run TestLifecycle_NoReEvaluation
 
 ---
 
+## Phase 5 Additions (shipment domain, provider seam, agent orchestration) — LOCKED
+
+These rules are locked with the same authority as R1–R22. The existing rules
+above remain verbatim; this section extends them to the shipment domain and
+the agent-facing surfaces added in plans10/plans11.
+
+23. **Provider seam**: `internal/provider` defines the generic
+    `EvidenceProvider` contract (`ExtractFields` → `[]RawExtraction`).
+    Sanctioned consumers are the ingest path ONLY (`cmd/ingest`,
+    `cmd/evidence-mcp`). In addition to R13, `internal/service` and
+    `cmd/doctrust-mcp` must NEVER import `internal/provider`. Enforced by
+    `make lint-imports`.
+24. **Trade-document canonical types**: `commercial_invoice`, `packing_list`,
+    `bill_of_lading`, `certificate_of_origin` are canonical
+    `types.DocumentType` values; the SourceDoc rule (R16) applies unchanged.
+    Shipment snapshots additionally carry a graph-level `case_id`
+    (`shipment_<sha256[:16]>`) derived from canonical snapshot CONTENT, while
+    `LoadCase` continues to derive its case_id from raw snapshot BYTES. Both
+    identifiers are recorded (snapshot field vs tool/audit output) and must
+    not be conflated.
+25. **Shipment check semantics are locked**:
+    `required_shipment_documents` returns REVIEW/BLOCKING when required trade
+    documents are missing — never FAIL and never PASS (the progressive-evidence
+    workflow depends on insufficient-evidence REVIEW).
+    `gross_weight_reconciliation` evaluates `all_equal` across the configured
+    sources for semantic type `shipment.gross_weight` with tolerance default
+    0.005 KG; missing sources ⇒ REVIEW/insufficient; mismatch ⇒ REVIEW naming
+    outliers in reason and metrics; conflicting duplicate observations within
+    one source ⇒ REVIEW.
+26. **Compliance Skill deployment**: `skills/<name>/SKILL.md` is the CANONICAL
+    source of truth. Runtime copies under `~/.hermes/skills/` are DERIVED and
+    deployed only via `scripts/install-skill.sh`; independently editing the
+    runtime copy is forbidden. Skill loading must be verified by both
+    `hermes skills list` AND a live filtered run.
+27. **Secrets never enter MCP registration configuration or logs.**
+    Provider credentials resolve at process runtime from the launch environment
+    or an `--env-file` PATH (e.g., `doctrust/.env`). Registrations carry only
+    file PATHS. Credential values must never appear in plans, transcripts,
+    screenshots, reports, or source control.
+28. **Rehearsal evidence availability is filesystem-enforced.** Documents
+    withheld from an adaptive run live OUTSIDE `DOCTRUST_SNAPSHOT_ROOT` until
+    released; prompt-only unavailability is forbidden. Release happens only
+    after the agent's documented choice following a genuine insufficient-
+    evidence REVIEW.
+
 ## Existing Checks Reference
 
 ### gross_income_consistency (v1.0)
@@ -671,3 +742,31 @@ Semantic guard preventing false contradictions between net cash flow and gross t
 4. If both present → PASS/INFO ("correctly treated as incomparable")
 
 **Never produces FAIL.** Its purpose is to confirm the system recognizes semantic incomparability.
+
+### required_shipment_documents (v1.0) — shipment domain
+
+Verifies the four trade-document types contributed evidence. **Missing
+documents ⇒ REVIEW/BLOCKING** ("insufficient evidence: N of 4 … missing: …") —
+never FAIL, never PASS; this REVIEW drives the progressive-evidence workflow.
+
+**Params:** `required` (list; defaults to all four trade-document types).
+
+### gross_weight_reconciliation (v1.0) — shipment domain
+
+Reconciles `shipment.gross_weight` observations across the required trade
+documents (`all_equal`).
+
+**Params:** `semantic_type` (default `shipment.gross_weight`), `sources`
+(default: all four trade types), `unit` (default KG), `tolerance`
+(default 0.005).
+
+**Logic:** group observations by canonical source; conflicting duplicates
+within one source ⇒ REVIEW; any required source missing ⇒ REVIEW/insufficient
+with `missing_sources` metrics; numeric mismatch ⇒ REVIEW/BLOCKING naming
+outliers with per-source observations in metrics; agreement ⇒ PASS.
+
+**Metrics:** `condition`, `unit`, `missing_sources` / `observations`,
+`outliers`, `value`, `source_count`.
+
+Scenario corpus: `scenarios/shipment_release/check_shipment_release.yaml`
+(6 scenarios), executed by `TestRunAllShipmentScenarios`.
