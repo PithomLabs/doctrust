@@ -14,10 +14,13 @@ const (
 )
 
 type HumanReview struct {
-	FindingIndex int           `json:"finding_index"`
-	Action       FindingAction `json:"action"`
-	Note         string        `json:"note"`
-	ResolvedAt   time.Time     `json:"resolved_at"`
+	FindingIndex     int           `json:"finding_index"`
+	Action           FindingAction `json:"action"`
+	Note             string        `json:"note"`
+	ResolvedAt       time.Time     `json:"resolved_at"`
+	ReviewerIdentity string        `json:"reviewer_identity,omitempty"` // Phase 6: authenticated local human
+	Channel          string        `json:"channel,omitempty"`           // Phase 6: e.g. "human-tty"
+	KeyID            string        `json:"key_id,omitempty"`            // Phase 6: signing key id
 }
 
 type Finding struct {

@@ -1,0 +1,88 @@
+{
+  "loadcase_id": "e14895b79cd1365c",
+  "graph_case_id": "income_verification_001",
+  "snapshot_sha256": "e14895b79cd1365cf199a86ff506cb06d8c254cb000dd24a9697113747016467",
+  "status": "REVIEW",
+  "findings": [
+    {
+      "index": 0,
+      "check_id": "gross_income_consistency",
+      "status": "REVIEW",
+      "severity": "WARNING",
+      "reason": "Variance exceeds tolerance; documented bonus may explain",
+      "metrics": {
+        "bonus": 18000,
+        "explained_by_bonus": true,
+        "paystub_gross": 138000,
+        "tolerance_pct": 3,
+        "variance_pct": 15,
+        "w2_gross": 120000
+      },
+      "evidence": [
+        {
+          "field": "gross_income_projected",
+          "source_doc": "paystub",
+          "source_span": "page=1;bbox=[342.7,441.4,77.8,9.7]",
+          "confidence": 0.95
+        },
+        {
+          "field": "gross_income_taxable",
+          "source_doc": "w2",
+          "source_span": "page=1;bbox=[223.9,614.2,44.6,7.9]",
+          "confidence": 0.95
+        },
+        {
+          "field": "gross_income_taxable",
+          "source_doc": "form_1040",
+          "source_span": "page=1;bbox=[409.0,524.2,49.7,9.0]",
+          "confidence": 0.95
+        },
+        {
+          "field": "bonus_compensation",
+          "source_doc": "paystub",
+          "source_span": "page=1;bbox=[513.0,493.2,44.6,9.0]",
+          "confidence": 0.95
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "check_id": "required_documents",
+      "status": "PASS",
+      "severity": "INFO",
+      "reason": "All required documents present"
+    },
+    {
+      "index": 2,
+      "check_id": "net_vs_gross_incomparability",
+      "status": "PASS",
+      "severity": "INFO",
+      "reason": "Net cash flow correctly treated as incomparable to gross taxable income",
+      "evidence": [
+        {
+          "field": "net_cash_flow",
+          "source_doc": "bank_statement",
+          "source_span": "page=1;bbox=[207.0,595.1,44.6,9.0]",
+          "confidence": 0.95
+        },
+        {
+          "field": "gross_income_taxable",
+          "source_doc": "w2",
+          "source_span": "page=1;bbox=[223.9,614.2,44.6,7.9]",
+          "confidence": 0.95
+        },
+        {
+          "field": "gross_income_taxable",
+          "source_doc": "form_1040",
+          "source_span": "page=1;bbox=[409.0,524.2,49.7,9.0]",
+          "confidence": 0.95
+        }
+      ]
+    }
+  ],
+  "ruleset": {
+    "id": "income_verification",
+    "version": "2",
+    "hash": "c5f7a1fd9c7174a900bdf5fae01192563ee1dab7134064518bb15a9946239d24"
+  }
+}

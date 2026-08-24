@@ -236,10 +236,12 @@ func (s *DocTrustService) BuildArtifact() (*audit.Artifact, error) {
 	for _, r := range s.case_.reviewStore.GetAll() {
 		reviewsMap[r.FindingIndex] = r
 		artifact.AddHumanReview(audit.HumanReviewRecord{
-			FindingIndex: r.FindingIndex,
-			Action:       string(r.Action),
-			Note:         r.Note,
-			ResolvedAt:   r.ResolvedAt,
+			FindingIndex:     r.FindingIndex,
+			Action:           string(r.Action),
+			Note:             r.Note,
+			ResolvedAt:       r.ResolvedAt,
+			ReviewerIdentity: r.ReviewerIdentity, // Phase 6
+			Channel:          r.Channel,          // Phase 6
 		})
 	}
 

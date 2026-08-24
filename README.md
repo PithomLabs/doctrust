@@ -135,6 +135,11 @@ bin/ingest -domain shipment_release \
 
 ./scripts/rehearse-hermes-shipment.sh        # real adaptive Hermes run + assertions A1–A10b
 ./scripts/failure-rehearsals.sh              # trust-boundary failure rehearsals F1–F5
+
+# Human authority (Phase 6): the agent can NEVER approve/reject.
+bin/doctrust-review --provision owner --publish-to demo/shipment_release/reviewers
+bin/doctrust-review --snapshot <case>/evidence_snapshot.json --reviewer owner
+./scripts/rehearse-phase6-human.sh           # denied agent attempt + authorized human resolution proofs
 ```
 
 Reports: `g1/G1_REPORT.md` (live extraction proof) ·
@@ -522,6 +527,7 @@ go test ./cmd/verify-ruleset/...                        # version/hash assertion
 | Phase 4 | Frozen | Enriched evaluation UI, audit artifact with ruleset provenance, bbox grounding, server trust tests |
 | Shipment evidence pipeline (plans10) | COMPLETE | Provider seam (`internal/provider`), shipment domain + promoted Ruleset v1, thin evidence-mcp, **G1 gate passed**: live Nutrient extraction matched ground truth 14/14 with page/bbox provenance — see [g1/G1_REPORT.md](g1/G1_REPORT.md) |
 | Agent orchestration & Compliance Skill (plans11 / Phase 5) | COMPLETE | Canonical skill + Hermes registrations + genuine adaptive investigation on live evidence; 13/13 assertions, F1–F5 rehearsals green — see [phase5/PHASE5_REPORT.md](phase5/PHASE5_REPORT.md) |
+| Human authority channel (plans12 / Phase 6) | COMPLETE | `request_human_review` removed from the agent surface (structurally denied); human-only Ed25519-signed review TTY (`bin/doctrust-review`); fail-closed signature verification — see [phase6/PHASE6_REPORT.md](phase6/PHASE6_REPORT.md) |
 
 ---
 
@@ -532,10 +538,10 @@ Verified-state documentation — what the current proof covers and where it ends
 - **Review store is in-memory, single-case-per-process.** Human reviews and
   audit artifacts are not persisted across process restarts; the demo
   finalizes within one session.
-- **`request_human_review` caller authentication is deferred to Phase 6.**
-  The tool exists on the frozen MCP surface; Phase-5 enforcement is the skill's
-  forbidden action + transcript assertions + audit verification (zero
-  HumanReviewRecords after agent-only runs).
+- **Human review authority (Phase 6)** is enforced structurally:
+  `request_human_review` does not exist on the agent MCP surface, and the
+  human-only TTY channel signs every decision with Ed25519 (fail-closed
+  verification). Deferred: multi-user identity management and web approval UI.
 - **Vestigial `MISSING_EVIDENCE`** exists only in the legacy Rego reference
   path; the Go engine uses PASS/REVIEW/FAIL exclusively.
 - **Empty scaffolds**: `internal/policy/`, `internal/server/`,

@@ -15,6 +15,8 @@ build:
 	go build -o bin/promote-check ./cmd/promote-check/
 	go build -o bin/verify-ruleset ./cmd/verify-ruleset/
 	go build -o bin/evidence-mcp ./cmd/evidence-mcp/
+	go build -o bin/doctrust-mcp ./cmd/doctrust-mcp/
+	go build -o bin/doctrust-review ./cmd/doctrust-review/
 
 # Run the ingest pipeline on demo documents
 run: build

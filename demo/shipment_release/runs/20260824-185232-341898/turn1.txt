@@ -1,0 +1,38 @@
+## Compliance Check Report: Shipment Release Policy
+
+### Artifacts Checked
+- **01-commercial-invoice.pdf** (commercial_invoice)
+- **03-bill-of-lading.pdf** (bill_of_lading)
+
+### Policy Evaluated
+- **Ruleset**: `shipment_release` (version 1)
+- **Checks**: `required_shipment_documents` (v1.0), `gross_weight_reconciliation` (v1.0)
+
+### Evidence Snapshot
+- **Case ID**: `a781ed59e97ffdf3` (evaluation)
+- **Snapshot**: `shipment_3a2ea0ec5ce1a41b` (2 documents, 9 claims extracted)
+  - Commercial invoice: 5 fields (container_number, invoice_number, seal_number, shipment_id, total_gross_weight)
+  - Bill of lading: 4 fields (bill_of_lading_number, container_number, gross_weight, seal_number)
+
+### Findings (DocTrust Disposition: **REVIEW** — BLOCKING)
+
+| Check | Status | Severity | Reason |
+|-------|--------|----------|--------|
+| `required_shipment_documents` | **REVIEW** | BLOCKING | **Insufficient evidence**: 2 of 4 required shipment documents present; **missing: certificate_of_origin, packing_list** |
+| `gross_weight_reconciliation` | **REVIEW** | BLOCKING | **Insufficient evidence** for `shipment.gross_weight`: missing sources `certificate_of_origin`, `packing_list` (2 present, 4 required) |
+
+### Evidence References
+- **Gross weight present sources** (both 0.95 confidence):
+  - Bill of Lading: `page=1;bbox=[459.0,288.0,50.4,7.9]`
+  - Commercial Invoice: `page=1;bbox=[511.9,349.9,50.8,6.8]`
+- No evidence found for `certificate_of_origin` or `packing_list` (not provided).
+
+### Disposition
+**REVIEW** — The approved policy requires 4 shipment documents (commercial invoice, packing list, bill of lading, certificate of origin) and gross-weight reconciliation across all 4 sources. Only 2 documents were supplied. Per the compliance-check-artifact skill, **REVIEW means unresolved and requiring human authority**; I must not convert this to PASS by reasoning.
+
+### Next Steps (per runbook)
+- To resolve: obtain the **missing required documents** (packing list, certificate of origin) through the authorized evidence provider, extend the snapshot, and re-evaluate.
+- Escalate this REVIEW decision to human authority for disposition.
+
+### Audit Identifier
+- Evaluation case: **`a781ed59e97ffdf3`** (ruleset `shipment_release` v1)

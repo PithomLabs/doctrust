@@ -9,25 +9,25 @@ import (
 )
 
 type Artifact struct {
-	Version          string                 `json:"version"`
-	PolicyID         string                 `json:"policy_id"`
-	PolicyHash       string                 `json:"policy_hash"`
-	RulesetID        string                 `json:"ruleset_id"`
-	RulesetVersion   string                 `json:"ruleset_version"`
-	RulesetHash      string                 `json:"ruleset_hash"`
-	Decisions        []Decision             `json:"decisions"`
-	Documents        []DocumentRecord       `json:"documents"`
-	HumanReviews     []HumanReviewRecord    `json:"human_reviews,omitempty"`
-	FinalDisposition string                 `json:"final_disposition,omitempty"`
-	CreatedAt        time.Time              `json:"created_at"`
-	CompletedAt      *time.Time             `json:"completed_at,omitempty"`
-	Signatures       []Signature            `json:"signatures,omitempty"`
-	Manifest         Manifest               `json:"manifest"`
+	Version          string              `json:"version"`
+	PolicyID         string              `json:"policy_id"`
+	PolicyHash       string              `json:"policy_hash"`
+	RulesetID        string              `json:"ruleset_id"`
+	RulesetVersion   string              `json:"ruleset_version"`
+	RulesetHash      string              `json:"ruleset_hash"`
+	Decisions        []Decision          `json:"decisions"`
+	Documents        []DocumentRecord    `json:"documents"`
+	HumanReviews     []HumanReviewRecord `json:"human_reviews,omitempty"`
+	FinalDisposition string              `json:"final_disposition,omitempty"`
+	CreatedAt        time.Time           `json:"created_at"`
+	CompletedAt      *time.Time          `json:"completed_at,omitempty"`
+	Signatures       []Signature         `json:"signatures,omitempty"`
+	Manifest         Manifest            `json:"manifest"`
 }
 
 type Decision struct {
-	CaseID    string   `json:"case_id"`
-	State     string   `json:"state"`
+	CaseID    string    `json:"case_id"`
+	State     string    `json:"state"`
 	Findings  []Finding `json:"findings"`
 	DecidedAt time.Time `json:"decided_at"`
 }
@@ -43,12 +43,12 @@ type Finding struct {
 }
 
 type DocumentRecord struct {
-	FileName    string         `json:"file_name"`
-	DocType     string         `json:"doc_type"`
-	Hash        string         `json:"hash"`
-	ExtractedAt time.Time      `json:"extracted_at"`
-	Confidence  float64        `json:"confidence"`
-	Citations   []Citation     `json:"citations,omitempty"`
+	FileName    string     `json:"file_name"`
+	DocType     string     `json:"doc_type"`
+	Hash        string     `json:"hash"`
+	ExtractedAt time.Time  `json:"extracted_at"`
+	Confidence  float64    `json:"confidence"`
+	Citations   []Citation `json:"citations,omitempty"`
 }
 
 type Citation struct {
@@ -80,18 +80,20 @@ type Manifest struct {
 }
 
 type HumanReviewRecord struct {
-	FindingIndex int       `json:"finding_index"`
-	Action       string    `json:"action"`
-	Note         string    `json:"note"`
-	ResolvedAt   time.Time `json:"resolved_at"`
+	FindingIndex     int       `json:"finding_index"`
+	Action           string    `json:"action"`
+	Note             string    `json:"note"`
+	ResolvedAt       time.Time `json:"resolved_at"`
+	ReviewerIdentity string    `json:"reviewer_identity,omitempty"` // Phase 6
+	Channel          string    `json:"channel,omitempty"`           // Phase 6: "human-tty"
 }
 
 func NewArtifact(policyID, policyHash string) *Artifact {
 	return &Artifact{
-		Version:   "1.0",
-		PolicyID:  policyID,
+		Version:    "1.0",
+		PolicyID:   policyID,
 		PolicyHash: policyHash,
-		CreatedAt: time.Now().UTC(),
+		CreatedAt:  time.Now().UTC(),
 	}
 }
 

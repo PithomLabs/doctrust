@@ -578,6 +578,9 @@ These are violations. Do not do them.
 - ❌ Persisting provider credentials into MCP registration configuration
 - ❌ Editing the derived Hermes skill copy independently of the canonical source
 - ❌ Simulating evidence availability in rehearsals instead of real filesystem gating
+- ❌ Exposing `request_human_review` (or any HumanReviewRecord-writing path) on an agent-facing MCP surface
+- ❌ Copying or logging the decrypted reviewer private key or passphrase
+- ❌ Skipping Ed25519 verification of the reviews sidecar at disposition/finalize/audit time
 
 ---
 
@@ -699,6 +702,31 @@ the agent-facing surfaces added in plans10/plans11.
     released; prompt-only unavailability is forbidden. Release happens only
     after the agent's documented choice following a genuine insufficient-
     evidence REVIEW.
+
+### Phase 6 Addition (human authority channel) — LOCKED
+
+29. **`request_human_review` is HUMAN-CHANNEL-ONLY.** It is removed from the
+    `cmd/doctrust-mcp` agent-facing surface (5 tools remain). The ONLY writer
+    of `HumanReviewRecord`s is the human-only interactive TTY command
+    (`cmd/doctrust-review`), which:
+    - refuses non-TTY execution (isatty gate in production binaries);
+    - authenticates the local human (OS user / `DOCTRUST_REVIEWER` override +
+      interactive typed consent);
+    - signs every record with **Ed25519** using a passphrase-encrypted private
+      key stored OUTSIDE any snapshot root (`~/.doctrust-reviewer/<name>.key.enc`
+      by default); the passphrase is never stored anywhere;
+    - publishes public keys to the trusted reviewers ring
+      `<snapshot-root>/reviewers/<name>.pub`;
+    - binds each signature to case ID, snapshot SHA-256, finding index, action,
+      identity, note, resolved_at, and Ruleset id/version/hash.
+    DocTrust verifies signatures whenever records are loaded (disposition,
+    finalize, audit); missing/forged/wrong-key/content-mismatched signatures
+    FAIL CLOSED (hard error — a human record can never be silently dropped).
+    The human TTY can AUTHOR records but can never finalize a case;
+    finalization belongs exclusively to DocTrust. `bin/server POST /api/review`
+    remains an out-of-scope localhost/debug surface, not the trusted path.
+    Review semantics are unchanged: reject → FAIL · confirm/override on all
+    findings → PASS · unresolved → REVIEW.
 
 ## Existing Checks Reference
 

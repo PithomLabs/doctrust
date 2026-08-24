@@ -2,9 +2,15 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -73,8 +79,15 @@ type checkInfo struct {
 	Version string `json:"version"`
 }
 
+// handlerSerial enforces strictly ordered tool execution: the Go MCP SDK may
+// dispatch calls concurrently, but DocTrust's pinned-case lifecycle assumes
+// sequential handling (evaluate must complete before findings/evidence/audit).
+var handlerSerial sync.Mutex
+
 func withPanicRecovery(name string, h func() (*mcp.CallToolResult, error)) func() (*mcp.CallToolResult, error) {
 	return func() (res *mcp.CallToolResult, err error) {
+		handlerSerial.Lock()
+		defer handlerSerial.Unlock()
 		defer func() {
 			if r := recover(); r != nil {
 				slog.Error("tool panic recovered", "tool", name, "panic", r)
@@ -84,6 +97,53 @@ func withPanicRecovery(name string, h func() (*mcp.CallToolResult, error)) func(
 		}()
 		return h()
 	}
+}
+
+// mergeAuthorizedReviews loads the human-channel reviews sidecar associated
+// with the pinned snapshot (if any), verifies every Ed25519 signature against
+// the provisioned reviewers ring (<snapshot-root>/reviewers/*.pub), and feeds
+// valid records into the pinned case. Fail-closed: any verification error is
+// returned and blocks disposition/finalize/audit until resolved.
+func mergeAuthorizedReviews(svc *service.DocTrustService, snapshotRoot string) *mcp.CallToolResult {
+	snapPath := svc.GetSnapshotPath()
+	if snapPath == "" || svc.GetCaseID() == "" {
+		return nil // nothing loaded yet
+	}
+	reviewsPath := snapPath + ".doctrust_reviews.json"
+	if _, err := os.Stat(reviewsPath); err != nil {
+		return nil // no human action recorded yet — normal pre-review state
+	}
+	ringDir := filepath.Join(snapshotRoot, "reviewers")
+	entries, err := os.ReadDir(ringDir)
+	if err != nil && !os.IsNotExist(err) {
+		return errResult("INTERNAL_ERROR", "reviews ring unreadable: "+err.Error())
+	}
+	ring := map[string]ed25519.PublicKey{}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".pub") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(ringDir, e.Name()))
+		if err != nil {
+			continue
+		}
+		pub, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(data)))
+		if err != nil || len(pub) != ed25519.PublicKeySize {
+			continue
+		}
+		ring[strings.TrimSuffix(e.Name(), ".pub")] = ed25519.PublicKey(pub)
+	}
+	sc, err := review.LoadReviewsSidecar(reviewsPath)
+	if err != nil {
+		return errResult("REVIEWS_INVALID", err.Error())
+	}
+	if sc.CaseID != "" && sc.CaseID != svc.GetCaseID() && sc.CaseID != svc.GetGraphCaseID() {
+		return errResult("REVIEWS_INVALID", "reviews sidecar bound to a different case")
+	}
+	if err := svc.LoadAuthorizedReviews(sc.Records, ring); err != nil {
+		return errResult("REVIEWS_REJECTED", err.Error())
+	}
+	return nil
 }
 
 func registerTools(server *mcp.Server, svc *service.DocTrustService, snapshotRoot string) {
@@ -123,6 +183,15 @@ func registerTools(server *mcp.Server, svc *service.DocTrustService, snapshotRoo
 				return errResult("INTERNAL_ERROR", fmt.Sprintf("evaluation failed: %v", err)), nil
 			}
 			caseID := svc.GetCaseID()
+			// Phase 6 (P6-7): persist the decision context so the human-only
+			// review channel can consume it. Additive sidecar; evaluation
+			// semantics unchanged.
+			if sc, err := svc.BuildDecisionSidecar(); err == nil {
+				data, jerr := json.MarshalIndent(sc, "", "  ")
+				if jerr == nil {
+					_ = os.WriteFile(resolved+".decision.json", data, 0o644)
+				}
+			}
 			var severity string
 			for _, r := range decision.Results {
 				if string(r.Severity) == "BLOCKING" {
@@ -261,81 +330,10 @@ func registerTools(server *mcp.Server, svc *service.DocTrustService, snapshotRoo
 		})()
 	})
 
-	server.AddTool(&mcp.Tool{
-		Name:        "request_human_review",
-		Description: "Record a human review decision (confirm/reject/override) on a finding.",
-		InputSchema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"case_id": map[string]any{
-					"type":        "string",
-					"description": "The case ID from evaluate_case",
-				},
-				"finding_index": map[string]any{
-					"type":        "integer",
-					"description": "Zero-based index of the finding to review",
-				},
-				"action": map[string]any{
-					"type":        "string",
-					"enum":        []string{"confirm", "reject", "override"},
-					"description": "Review action: confirm, reject, or override",
-				},
-				"note": map[string]any{
-					"type":        "string",
-					"description": "Optional note from the reviewer",
-				},
-			},
-			"required": []string{"case_id", "finding_index", "action"},
-		},
-	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return withPanicRecovery("request_human_review", func() (*mcp.CallToolResult, error) {
-			var args struct {
-				CaseID       string `json:"case_id"`
-				FindingIndex int    `json:"finding_index"`
-				Action       string `json:"action"`
-				Note         string `json:"note"`
-			}
-			if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
-				return errResult("INVALID_ARGUMENT", fmt.Sprintf("invalid arguments: %v", err)), nil
-			}
-			if r := validateCaseID(svc, args.CaseID); r != nil {
-				return r, nil
-			}
-			if r := validateEvaluated(svc); r != nil {
-				return r, nil
-			}
-			var action review.FindingAction
-			switch args.Action {
-			case "confirm":
-				action = review.ActionConfirm
-			case "reject":
-				action = review.ActionReject
-			case "override":
-				action = review.ActionOverride
-			default:
-				return errResult("INVALID_ACTION", fmt.Sprintf("action must be confirm, reject, or override; got %q", args.Action)), nil
-			}
-			reviewID, err := svc.RequestHumanReview(args.FindingIndex, action, args.Note)
-			if err != nil {
-				return errResult("INVALID_FINDING_INDEX", err.Error()), nil
-			}
-			reviews, _ := svc.GetReviews()
-			var resolvedAt string
-			for _, r := range reviews {
-				if r.FindingIndex == args.FindingIndex {
-					resolvedAt = r.ResolvedAt.Format("2006-01-02T15:04:05Z")
-					break
-				}
-			}
-			return okResult(map[string]any{
-				"review_id":     reviewID,
-				"finding_index": args.FindingIndex,
-				"action":        args.Action,
-				"resolved_at":   resolvedAt,
-			}), nil
-		})()
-	})
-
+	// NOTE (Phase 6 / plans12): request_human_review was REMOVED from the
+	// agent-facing surface. Human authority is exercised exclusively through
+	// the human-only TTY channel (cmd/doctrust-review), whose Ed25519-signed
+	// records are merged fail-closed by get_audit_artifact. See AGENTS.md R29.
 	server.AddTool(&mcp.Tool{
 		Name:        "get_audit_artifact",
 		Description: "Generate the tamper-evident audit artifact for the evaluated case.",
@@ -351,6 +349,9 @@ func registerTools(server *mcp.Server, svc *service.DocTrustService, snapshotRoo
 		},
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return withPanicRecovery("get_audit_artifact", func() (*mcp.CallToolResult, error) {
+			if r := mergeAuthorizedReviews(svc, snapshotRoot); r != nil {
+				return r, nil
+			}
 			var args struct {
 				CaseID string `json:"case_id"`
 			}
@@ -368,9 +369,9 @@ func registerTools(server *mcp.Server, svc *service.DocTrustService, snapshotRoo
 				return errResult("INTERNAL_ERROR", fmt.Sprintf("artifact build failed: %v", err)), nil
 			}
 			return okResult(map[string]any{
-				"artifact":           artifact,
-				"artifact_hash":      artifact.Hash(),
-				"final_disposition":  artifact.FinalDisposition,
+				"artifact":          artifact,
+				"artifact_hash":     artifact.Hash(),
+				"final_disposition": artifact.FinalDisposition,
 			}), nil
 		})()
 	})

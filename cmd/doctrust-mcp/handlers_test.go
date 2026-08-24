@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -296,7 +297,11 @@ func TestMCP_GetRuleset(t *testing.T) {
 	t.Logf("ruleset: id=%v version=%v checks=%d", out["id"], out["version"], len(checks))
 }
 
-func TestMCP_RequestHumanReview(t *testing.T) {
+// TestMCP_RequestHumanReview_Removed (Phase 6 / plans12 P6-1): the
+// human-authority capability must NOT exist on the agent-facing surface.
+// A direct call fails at the protocol level (unknown tool), and tools/list
+// does not advertise it.
+func TestMCP_RequestHumanReview_Removed(t *testing.T) {
 	svc := setupTestService(t)
 	root := testSnapshotRoot(t)
 	tc := setupTestClient(t, svc, root)
@@ -304,71 +309,46 @@ func TestMCP_RequestHumanReview(t *testing.T) {
 	evalRes := callTool(t, tc, "evaluate_case", map[string]any{
 		"snapshot_path": "income_verification/evidence_snapshot.json",
 	})
-	evalOut := parseResult(t, evalRes)
-	caseID := evalOut["case_id"].(string)
+	parseResult(t, evalRes)
 
-	res := callTool(t, tc, "request_human_review", map[string]any{
-		"case_id":       caseID,
+	// Direct call must fail at protocol level OR as an error result — never
+	// succeed.
+	var raw json.RawMessage
+	rawArgs := map[string]any{
+		"case_id":       svc.GetCaseID(),
 		"finding_index": 0,
 		"action":        "confirm",
-		"note":          "Bonus variance accepted",
-	})
-	out := parseResult(t, res)
-
-	if out["review_id"] == "" {
-		t.Error("expected non-empty review_id")
 	}
-	if out["action"] != "confirm" {
-		t.Errorf("expected action=confirm, got %v", out["action"])
+	if b, err := json.Marshal(rawArgs); err != nil {
+		t.Fatal(err)
+	} else {
+		raw = b
 	}
-	t.Logf("review: review_id=%v action=%v", out["review_id"], out["action"])
-}
-
-func TestMCP_RequestHumanReview_InvalidAction(t *testing.T) {
-	svc := setupTestService(t)
-	root := testSnapshotRoot(t)
-	tc := setupTestClient(t, svc, root)
-
-	evalRes := callTool(t, tc, "evaluate_case", map[string]any{
-		"snapshot_path": "income_verification/evidence_snapshot.json",
+	res, callErr := tc.client.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "request_human_review",
+		Arguments: raw,
 	})
-	evalOut := parseResult(t, evalRes)
-	caseID := evalOut["case_id"].(string)
-
-	res := callTool(t, tc, "request_human_review", map[string]any{
-		"case_id":       caseID,
-		"finding_index": 0,
-		"action":        "escalate",
-	})
-	e := parseError(t, res)
-	if e.Code != "INVALID_ACTION" {
-		t.Errorf("expected INVALID_ACTION, got %s", e.Code)
+	denied := false
+	if callErr != nil {
+		denied = strings.Contains(strings.ToLower(callErr.Error()), "unknown tool")
+	} else if res != nil && res.IsError {
+		tc2, _ := res.Content[0].(*mcp.TextContent)
+		denied = strings.Contains(strings.ToLower(tc2.Text), "unknown tool")
 	}
-}
-
-func TestMCP_GetAuditArtifact(t *testing.T) {
-	svc := setupTestService(t)
-	root := testSnapshotRoot(t)
-	tc := setupTestClient(t, svc, root)
-
-	evalRes := callTool(t, tc, "evaluate_case", map[string]any{
-		"snapshot_path": "income_verification/evidence_snapshot.json",
-	})
-	evalOut := parseResult(t, evalRes)
-	caseID := evalOut["case_id"].(string)
-
-	res := callTool(t, tc, "get_audit_artifact", map[string]any{
-		"case_id": caseID,
-	})
-	out := parseResult(t, res)
-
-	if out["artifact_hash"] == "" {
-		t.Error("expected non-empty artifact_hash")
+	if !denied {
+		t.Fatalf("request_human_review must be structurally denied; callErr=%v res=%+v",
+			callErr, res)
 	}
-	if out["final_disposition"] == "" {
-		t.Error("expected non-empty final_disposition")
+
+	lt, err := tc.client.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("tools/list failed: %v", err)
 	}
-	t.Logf("artifact: hash=%v disposition=%v", out["artifact_hash"], out["final_disposition"])
+	for _, tool := range lt.Tools {
+		if tool.Name == "request_human_review" {
+			t.Fatal("agent surface must not advertise request_human_review")
+		}
+	}
 }
 
 func TestMCP_NoCaseLoaded(t *testing.T) {
@@ -382,7 +362,6 @@ func TestMCP_NoCaseLoaded(t *testing.T) {
 	}{
 		{"get_findings", map[string]any{"case_id": "bogus"}},
 		{"get_evidence", map[string]any{"case_id": "bogus", "finding_index": 0}},
-		{"request_human_review", map[string]any{"case_id": "bogus", "finding_index": 0, "action": "confirm"}},
 		{"get_audit_artifact", map[string]any{"case_id": "bogus"}},
 	}
 
@@ -605,7 +584,6 @@ func TestMCP_Trust_StaleCaseIDRejected(t *testing.T) {
 	}{
 		{"get_findings", map[string]any{"case_id": caseIDA}},
 		{"get_evidence", map[string]any{"case_id": caseIDA, "finding_index": 0}},
-		{"request_human_review", map[string]any{"case_id": caseIDA, "finding_index": 0, "action": "confirm"}},
 		{"get_audit_artifact", map[string]any{"case_id": caseIDA}},
 	}
 
