@@ -30,3 +30,4 @@ bin
 go.work
 
 .gut
+demo/shipment_release/runs/
