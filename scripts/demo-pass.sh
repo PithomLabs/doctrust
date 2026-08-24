@@ -2,7 +2,10 @@
 set -euo pipefail
 # demo-pass: coherent PASS package — all four gross weights agree at 4,650
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PASS_DIR="$ROOT/../doc-generator/examples/shipment-1047/generated-pass"
+PASS_DIR="$ROOT/demo/shipment_release/fixtures/pass"
+if [ ! -d "$PASS_DIR" ]; then
+  PASS_DIR="$ROOT/../doc-generator/examples/shipment-1047/generated-pass"
+fi
 if [ ! -d "$PASS_DIR" ]; then
   PASS_DIR="$ROOT/demo/shipment_release/pass-fixture"
 fi

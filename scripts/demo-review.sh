@@ -2,7 +2,10 @@
 set -euo pipefail
 # demo-review: anomaly package → REVIEW/BLOCKING → human authority → signed audit
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ANOMALY_DIR="$ROOT/../doc-generator/examples/shipment-1047/generated"
+ANOMALY_DIR="$ROOT/demo/shipment_release/fixtures/anomaly"
+if [ ! -d "$ANOMALY_DIR" ]; then
+  ANOMALY_DIR="$ROOT/../doc-generator/examples/shipment-1047/generated"
+fi
 if [ ! -d "$ANOMALY_DIR" ]; then
   ANOMALY_DIR="$ROOT/demo/shipment_release/anomaly-fixture"
 fi
