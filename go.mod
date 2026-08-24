@@ -6,6 +6,7 @@ require (
 	github.com/jung-kurt/gofpdf/v2 v2.17.3
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/open-policy-agent/opa v1.4.2
+	golang.org/x/sys v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -41,7 +42,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect

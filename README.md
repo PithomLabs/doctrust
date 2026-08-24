@@ -1,12 +1,18 @@
 # DocTrust — Universal Document Compliance Engine
 
+> DocTrust is a compliance execution layer that lets AI agents investigate business documents against approved policy — without ever letting the agent become the authority that decides compliance.
+
+**Demo target:** September 4, 2026 · **Business case:** [`BUSINESS_CASE.md`](BUSINESS_CASE.md)
+
+## Problem
+
+Regulated document workflows — trade compliance, KYC/AML, insurance claims, mortgage appraisal, e-invoicing — either rely on manual reconciliation that doesn't scale, or on “AI reads the PDF” tools whose decisions are unauditable and indefensible to a regulator. DocTrust solves the authority gap: agents can investigate, but only approved Rulesets evaluated deterministically (plus a signed human authority when required) can decide compliance. Shipment release — a single gross-weight mismatch across four trade documents triggering customs penalties — makes the cost concrete and is the first vertical wedge.
+
 Nutrient extraction → frozen evidence → deterministic evaluation → human review → audit artifact.
 AI-authored rules enter through a human-gated trust funnel before reaching the runtime.
 The agent-facing runtime ships as MCP tools (`doctrust-mcp` · `evidence-mcp`),
 operated by AI agents (Hermes or any MCP-capable harness) under a compliance skill:
 **the agent investigates; DocTrust enforces the approved policy.**
-
-**Demo target:** September 4, 2026
 
 ---
 
@@ -143,7 +149,36 @@ bin/doctrust-review --snapshot <case>/evidence_snapshot.json --reviewer owner
 ```
 
 Reports: `g1/G1_REPORT.md` (live extraction proof) ·
-`phase5/PHASE5_REPORT.md` (adaptive orchestration).
+`phase5/PHASE5_REPORT.md` (adaptive orchestration) ·
+`phase6/PHASE6_REPORT.md` (human authority).
+
+**PASS example:**
+
+```bash
+make demo-pass
+# → PASS — all four gross weights reconcile at 4,650 KG
+# audit: <run>/audit.json  (ruleset hash, findings, evidence page/bbox, artifact hash)
+```
+
+**REVIEW + human-authority example:**
+
+```bash
+make demo-review
+# → REVIEW / BLOCKING — B/L 5,150 KG vs 4,650 KG on the other three
+# → human sees grounded evidence (page/bbox), enters decision + passphrase
+# → Ed25519-signed review, DocTrust verifies, seals FAIL
+# → audit artifact with reviewer identity + final disposition
+```
+
+**What DWS does (same line in README, video, and DevPost):**
+
+> Nutrient DWS extracts structured, page-and-bbox-grounded fields from each PDF, giving DocTrust page-referenced facts instead of plausible-sounding guesses; DocTrust's Ruleset engine reconciles those facts and decides.
+
+**Adding a provider:** Implement `internal/provider.EvidenceProvider` (method `ExtractFields`) — see `internal/provider/provider.go` and the Nutrient implementation in `internal/nutrient`. No changes to DocTrust, Ruleset, evaluator, or the skill are required.
+
+**Adding a Ruleset:** New vertical = new Ruleset YAML + evidence mapping (e.g., KYC, insurance) on the same engine — see `rulesets/shipment_release/v1.yaml` as the template.
+
+**Business feasibility:** See [`BUSINESS_CASE.md`](BUSINESS_CASE.md) for the one-sentence pitch, buyer, pricing hypothesis (usage-based per case + enterprise tier for custom Rulesets/identity), and why the trust architecture — not extraction or LLM — is the moat. The wedge is shipment release; expansion is additional Rulesets on the same pipeline.
 
 ### Author a new check through the trust funnel
 

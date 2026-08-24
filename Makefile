@@ -110,9 +110,32 @@ clean:
 	rm -f demo/income_verification/evidence_snapshot.json
 	rm -f rulesets/*/working.yaml
 
-# Setup: download dependencies
+# Setup: download dependencies, validate env, build all binaries
 setup:
+	@echo "== setup: go mod tidy =="
 	go mod tidy
+	@echo "== setup: validating required env =="
+	@if [ -z "$$NUTRIENT_DWS_EXTRACTION_API_KEY" ] && ! grep -q "NUTRIENT_DWS_EXTRACTION_API_KEY=" .env 2>/dev/null; then echo "FAIL: NUTRIENT_DWS_EXTRACTION_API_KEY not set (set in env or .env)"; exit 1; fi
+	@echo "env OK (value not printed)"
+	@echo "== setup: building all binaries =="
+	$(MAKE) build
+	@echo "== setup: verifying MCP boundary =="
+	$(MAKE) lint-imports
+	@echo "setup complete"
+
+# One-command judge demos (Phase A)
+demo-pass:
+	@echo "== demo-pass: coherent PASS package =="
+	./scripts/demo-pass.sh
+
+demo-review:
+	@echo "== demo-review: anomaly package → REVIEW → human authority =="
+	./scripts/demo-review.sh
+
+verify-audit:
+	@echo "== verify-audit: machine-readable audit trace =="
+	@ls -lh *.audit.json 2>/dev/null || ls -lh demo/*/*.audit.json 2>/dev/null || echo "run make demo-pass or demo-review first"
+	@cat *.audit.json 2>/dev/null | jq '.ruleset, .findings, .human_action' || cat demo/*/*.audit.json 2>/dev/null | jq '.ruleset, .findings, .human_action' || echo "audit artifact not yet generated — run demo-* first"
 
 # Authoritative provider-boundary check
 # internal/service and cmd/doctrust-mcp must NOT depend on
