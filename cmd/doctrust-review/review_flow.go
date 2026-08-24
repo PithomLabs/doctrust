@@ -7,7 +7,6 @@ package main
 import (
 	"context"
 	"crypto/ed25519"
-
 	"encoding/json"
 	"errors"
 	"flag"
@@ -18,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doctrust/doctrust/internal/eval"
 	"github.com/doctrust/doctrust/internal/review"
 	"github.com/doctrust/doctrust/internal/service"
 )
@@ -43,10 +43,9 @@ func runReview() {
 	rulesetsDir := fs.String("rulesets-dir", defaultRulesetsDir(), "promoted rulesets directory")
 	reviewer := fs.String("reviewer", "", "reviewer name / key id (defaults to OS user)")
 	keyDir := fs.String("key-dir", defaultKeyDir(), "directory holding the passphrase-encrypted private key")
-	requireTTY := fs.Bool("tty", true, "require an interactive terminal (never disable in production)")
 	fs.Parse(osStdlib.Args[1:])
 
-	if *requireTTY && !isInteractive() {
+	if !isInteractive() {
 		fmt.Fprintln(osStdlib.Stderr,
 			"FATAL: human review requires an interactive terminal (TTY).")
 		fmt.Fprintln(osStdlib.Stderr,
@@ -72,11 +71,16 @@ func runReview() {
 	exitOn(err)
 }
 
-// runReviewFlow is the testable core.
+// runReviewFlow is the testable core. F-4: re-evaluation happens before
+// display so the human always sees the genuine DocTrust evaluation, never a
+// stale or forged sidecar. F-1: reviewer identity is validated against the
+// provisioned key's key_id.
 func runReviewFlow(ioh *reviewIO, opts reviewOptions) error {
 	if opts.SnapshotPath == "" {
 		return fmt.Errorf("--snapshot is required")
 	}
+
+	// --- Read decision sidecar for binding context (case ID, ruleset, snapshot hash) ---
 	decisionPath := opts.SnapshotPath + ".decision.json"
 	raw, err := osStdlib.ReadFile(decisionPath)
 	if err != nil {
@@ -90,20 +94,42 @@ func runReviewFlow(ioh *reviewIO, opts reviewOptions) error {
 		return fmt.Errorf("decision sidecar carries no findings")
 	}
 
+	// --- F-4: Re-evaluate deterministically BEFORE displaying findings. ---
+	// The sidecar is untrusted input; the human must see the genuine evaluation.
+	svc, err := service.NewDocTrustService(opts.Domain, opts.RulesetsDir)
+	if err != nil {
+		return fmt.Errorf("service: %w", err)
+	}
+	ctx := context.Background()
+	if err := svc.LoadCase(ctx, opts.SnapshotPath); err != nil {
+		return fmt.Errorf("load case: %w", err)
+	}
+	decision, err := svc.Evaluate(ctx)
+	if err != nil {
+		return fmt.Errorf("re-evaluate: %w", err)
+	}
+
+	// --- F-4: Verify sidecar findings match re-evaluation. ---
+	if err := compareFindings(sidecar.Findings, decision.Results); err != nil {
+		return fmt.Errorf("DECISION_SIDECAR_MISMATCH: %w", err)
+	}
+
+	// --- Display the re-evaluated findings (trusted source, not the sidecar). ---
 	fmt.Fprintf(ioh.out, "\nHuman authority required — case %s\n", sidecar.LoadcaseID)
 	fmt.Fprintf(ioh.out, "Ruleset: %s v%s (hash %.12s…)\n",
 		sidecar.Ruleset.ID, sidecar.Ruleset.Version, sidecar.Ruleset.Hash)
 	fmt.Fprintf(ioh.out, "Snapshot sha256: %.16s…\n", sidecar.SnapshotSHA256)
-	for _, f := range sidecar.Findings {
-		fmt.Fprintf(ioh.out, "  [%d] %-32s %s / %s\n", f.Index, f.CheckID, f.Status, f.Severity)
-		fmt.Fprintf(ioh.out, "      %s\n", oneLine(f.Reason))
-		for _, ev := range f.Evidence {
+	for i, r := range decision.Results {
+		fmt.Fprintf(ioh.out, "  [%d] %-32s %s / %s\n", i, r.CheckID, r.Status, r.Severity)
+		fmt.Fprintf(ioh.out, "      %s\n", oneLine(r.Reason))
+		for _, ev := range r.Evidence {
 			fmt.Fprintf(ioh.out, "      · %s @ %s (conf %.2f)\n",
 				ev.Field, ev.SourceSpan, ev.Confidence)
 		}
 	}
 	fmt.Fprintln(ioh.out)
 
+	// --- Passphrase + key loading ---
 	pass, err := ioh.secretFn("reviewer passphrase (unlocks signing key): ")
 	if err != nil {
 		return err
@@ -115,6 +141,12 @@ func runReviewFlow(ioh *reviewIO, opts reviewOptions) error {
 	}
 	fmt.Fprintf(ioh.out, "signing key unlocked: key_id=%q\n", keyID)
 
+	// --- F-1: Validate reviewer identity matches the provisioned key. ---
+	if keyID != opts.Reviewer {
+		return fmt.Errorf("reviewer identity mismatch: --reviewer=%q but key belongs to %q", opts.Reviewer, keyID)
+	}
+
+	// --- Interactive finding resolution ---
 	lr := lineReader{r: ioh.in}
 	var records []review.SignedReview
 	for {
@@ -129,18 +161,13 @@ func runReviewFlow(ioh *reviewIO, opts reviewOptions) error {
 			fmt.Fprintln(ioh.out, "  not a number; try again")
 			continue
 		}
-		var found *service.SidecarFinding
-		for i := range sidecar.Findings {
-			if sidecar.Findings[i].Index == idx {
-				found = &sidecar.Findings[i]
-			}
-		}
-		if found == nil {
-			fmt.Fprintln(ioh.out, "  unknown finding index")
+		if idx < 0 || idx >= len(decision.Results) {
+			fmt.Fprintf(ioh.out, "  unknown finding index (valid: 0-%d)\n", len(decision.Results)-1)
 			continue
 		}
+		r := &decision.Results[idx]
 		fmt.Fprintf(ioh.out, "action for [%d] %s — confirm/reject/override (or 'skip'): ",
-			idx, found.CheckID)
+			idx, r.CheckID)
 		actLine, _ := lr.ReadString('\n')
 		action := strings.TrimSpace(strings.ToLower(actLine))
 		switch action {
@@ -185,6 +212,7 @@ func runReviewFlow(ioh *reviewIO, opts reviewOptions) error {
 		return errors.New("no records signed — nothing written")
 	}
 
+	// --- Persist signed records ---
 	sidecarReviews := opts.SnapshotPath + ".doctrust_reviews.json"
 	for _, rec := range records {
 		if err := review.AppendSignedRecord(sidecarReviews, sidecar.LoadcaseID, rec); err != nil {
@@ -193,22 +221,7 @@ func runReviewFlow(ioh *reviewIO, opts reviewOptions) error {
 	}
 	fmt.Fprintf(ioh.out, "\n%d signed record(s) written to:\n  %s\n", len(records), sidecarReviews)
 
-	// Finalization (P6-7): this command IS part of DocTrust — it deterministically
-	// replays the evaluation, loads the signed records through the same
-	// fail-closed verification used everywhere else, and seals the audit
-	// artifact. The agent-facing MCP surface has no such capability.
-	svc, err := service.NewDocTrustService(opts.Domain, opts.RulesetsDir)
-	if err != nil {
-		return fmt.Errorf("service: %w", err)
-	}
-	ctx := context.Background()
-	if err := svc.LoadCase(ctx, opts.SnapshotPath); err != nil {
-		return fmt.Errorf("load case: %w", err)
-	}
-	d, err := svc.Evaluate(ctx)
-	if err != nil {
-		return fmt.Errorf("re-evaluate: %w", err)
-	}
+	// --- Finalization (P6-7): verify records and seal audit artifact. ---
 	ring := map[string]ed25519.PublicKey{keyID: pub}
 	if err := svc.LoadAuthorizedReviews(records, ring); err != nil {
 		return fmt.Errorf("authorize records: %w", err)
@@ -227,7 +240,48 @@ func runReviewFlow(ioh *reviewIO, opts reviewOptions) error {
 	}
 	fmt.Fprintf(ioh.out, "\nFINAL DISPOSITION: %s\n", artifact.FinalDisposition)
 	fmt.Fprintf(ioh.out, "artifact: %s\nartifact_hash: %s\n", auditPath, artifact.Manifest.ArtifactHash)
-	_ = d
+	return nil
+}
+
+// compareFindings verifies that the decision sidecar findings match the
+// freshly re-evaluated results. F-4: the human must never see stale or
+// forged findings.
+func compareFindings(sidecarFindings []service.SidecarFinding, evalResults []eval.Result) error {
+	if len(sidecarFindings) != len(evalResults) {
+		return fmt.Errorf("finding count mismatch: sidecar=%d evaluation=%d",
+			len(sidecarFindings), len(evalResults))
+	}
+	for i, sf := range sidecarFindings {
+		er := evalResults[i]
+		if sf.CheckID != string(er.CheckID) {
+			return fmt.Errorf("finding[%d] check_id mismatch: sidecar=%q evaluation=%q",
+				i, sf.CheckID, er.CheckID)
+		}
+		if sf.Status != string(er.Status) {
+			return fmt.Errorf("finding[%d] status mismatch: sidecar=%q evaluation=%q",
+				i, sf.Status, er.Status)
+		}
+		if sf.Severity != string(er.Severity) {
+			return fmt.Errorf("finding[%d] severity mismatch: sidecar=%q evaluation=%q",
+				i, sf.Severity, er.Severity)
+		}
+		if sf.Reason != er.Reason {
+			return fmt.Errorf("finding[%d] reason mismatch: sidecar=%q evaluation=%q",
+				i, sf.Reason, er.Reason)
+		}
+		if len(sf.Evidence) != len(er.Evidence) {
+			return fmt.Errorf("finding[%d] evidence count mismatch: sidecar=%d evaluation=%d",
+				i, len(sf.Evidence), len(er.Evidence))
+		}
+		for j, se := range sf.Evidence {
+			ee := er.Evidence[j]
+			if se.Field != ee.Field || se.SourceDoc != ee.SourceDoc ||
+				se.SourceSpan != ee.SourceSpan || se.Confidence != ee.Confidence {
+				return fmt.Errorf("finding[%d] evidence[%d] mismatch: sidecar=%+v evaluation=%+v",
+					i, j, se, ee)
+			}
+		}
+	}
 	return nil
 }
 

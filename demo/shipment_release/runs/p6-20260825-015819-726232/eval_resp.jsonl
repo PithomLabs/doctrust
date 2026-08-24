@@ -1,0 +1,2 @@
+{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"logging":{},"tools":{"listChanged":true}},"protocolVersion":"2024-11-05","serverInfo":{"name":"doctrust-mcp","version":"0.1.0"}}}
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"{\"case_id\":\"56cf311f09d45996\",\"finding_count\":2,\"ruleset_id\":\"shipment_release\",\"ruleset_version\":\"1\",\"severity\":\"BLOCKING\",\"status\":\"REVIEW\"}"}]}}

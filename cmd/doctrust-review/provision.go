@@ -10,7 +10,6 @@ import (
 )
 
 func runProvision(args []string) {
-	fmt.Fprintln(os.Stderr, "DEBUG-MARKER provision entered")
 	reviewer := ""
 	keyDir := defaultKeyDir()
 	pubOut := ""
@@ -65,7 +64,6 @@ func runProvision(args []string) {
 	exitOn(err)
 
 	fmt.Printf("\nprivate key written: %s (passphrase-encrypted)\n", path)
-	fmt.Printf("public key:          %s\n", b64(pub))
 	if pubOut != "" {
 		if err := os.MkdirAll(pubOut, 0o755); err != nil {
 			exitOn(err)
@@ -76,7 +74,8 @@ func runProvision(args []string) {
 		}
 		fmt.Printf("public key published to reviewers ring: %s\n", pubPath)
 	} else {
-		fmt.Println("(copy the public key line into the trusted reviewers ring manually)")
+		fmt.Println("No --publish-to specified. Add the public key to the reviewers ring manually.")
+		fmt.Printf("Public key file: %s.pub (base64)\n", reviewer)
 	}
 	fmt.Println("\nGuard this passphrase: it IS your signing authority.")
 }

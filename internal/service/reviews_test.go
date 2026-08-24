@@ -159,3 +159,44 @@ func TestLoadAuthorizedReviews_FullFlow(t *testing.T) {
 		t.Fatal("record bound to a different case must be rejected")
 	}
 }
+
+// F-1 residual: a deliberately constructed record where ReviewerIdentity != KeyID
+// must be rejected at the service merge boundary, even if the signature is valid.
+func TestLoadAuthorizedReviews_IdentityKeyMismatch(t *testing.T) {
+	rulesetsDir := provisionShipmentRuleset(t)
+	root := t.TempDir()
+	svc, err := NewDocTrustService("shipment_release", rulesetsDir)
+	if err != nil {
+		t.Fatalf("service: %v", err)
+	}
+	snapPath, snapSHA := writeSnapshotFile(t, root)
+	ctx := context.Background()
+	if err := svc.LoadCase(ctx, snapPath); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Evaluate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// provision two keys: alice signs, but claims to be owner
+	alicePub, alicePriv, _ := review.GenerateReviewerKeyPair()
+	ring := map[string]ed25519.PublicKey{"alice": alicePub}
+
+	rec := review.SignedReview{
+		CaseID: svc.GetCaseID(), SnapshotSHA256: snapSHA,
+		FindingIndex: 0, Action: review.ActionConfirm,
+		ReviewerIdentity: "owner", // mismatch: claims owner
+		Channel:          review.ChannelHumanTTY,
+		KeyID:            "alice", // but signed with alice's key
+		Ruleset:          review.RuleBinding{ID: "shipment_release", Version: "1", Hash: svc.GetRulesetHash()},
+	}
+	if err := review.SignRecord(alicePriv, &rec, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := svc.LoadAuthorizedReviews([]review.SignedReview{rec}, ring); err == nil {
+		t.Fatal("identity/key mismatch must be rejected at service merge boundary")
+	} else if !strings.Contains(err.Error(), "does not match signing key") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

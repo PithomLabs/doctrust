@@ -15,6 +15,7 @@ PY="${PYTHON:-python3}"
 FROZEN="/home/chaschel/Desktop/biz/nutrient/doc-generator/examples/shipment-1047/generated"
 WORKSPACE="$ROOT/demo/shipment_release"
 REVIEWER="owner"
+# Test-only default passphrase; use PHASE6_PASSPHRASE env for real runs.
 PASSPHRASE="${PHASE6_PASSPHRASE:-phase6-hold-passphrase}"
 
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
@@ -141,15 +142,13 @@ script -qec \
 # then fetch the sealed audit artifact. Requests are PACED so the server
 # processes them strictly in order.
 LOADCASE_ID="$(sha256sum "$SNAP_ABS" | cut -c1-16)"
-EXPECT_USER="$(id -un 2>/dev/null || echo unknown)"
 
 # Finalization happened inside the human-authority process (trusted DocTrust
 # code path): it replayed evaluation, verified the Ed25519 records, and sealed
 # the authoritative audit artifact.
 AUDIT_JSON="$SNAP_ABS.audit.json"
 
-EXPECT_USER="$(id -un 2>/dev/null || echo unknown)"
-$PY - "$AUDIT_JSON" "$EXPECT_USER" <<'PYASSERT'
+$PY - "$AUDIT_JSON" "$REVIEWER" <<'PYASSERT'
 import json, os, sys
 path, expect_user = sys.argv[1], sys.argv[2]
 a = json.load(open(path))

@@ -143,6 +143,10 @@ func (s *DocTrustService) LoadAuthorizedReviews(
 			return fmt.Errorf("review record ruleset binding mismatch (%s v%s %s)",
 				rec.Ruleset.ID, rec.Ruleset.Version, rec.Ruleset.Hash)
 		}
+		if rec.ReviewerIdentity != rec.KeyID {
+			return fmt.Errorf("reviewer identity %q does not match signing key %q",
+				rec.ReviewerIdentity, rec.KeyID)
+		}
 		if rec.FindingIndex < 0 || rec.FindingIndex >= len(s.case_.decision.Results) {
 			return fmt.Errorf("review record finding_index %d out of range",
 				rec.FindingIndex)
