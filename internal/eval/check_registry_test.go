@@ -78,11 +78,24 @@ func TestCheckRegistry(t *testing.T) {
 		}
 	})
 
-	t.Run("default registry has 3 checks", func(t *testing.T) {
+	t.Run("default registry has 5 checks", func(t *testing.T) {
 		r := DefaultRegistry()
 		all := r.All()
-		if len(all) != 3 {
-			t.Errorf("DefaultRegistry has %d checks, want 3", len(all))
+		if len(all) != 5 {
+			t.Errorf("DefaultRegistry has %d checks, want 5", len(all))
+		}
+		// plan10: shipment checks must be present alongside income checks.
+		for _, want := range []string{"gross_weight_reconciliation", "required_shipment_documents"} {
+			found := false
+			for _, c := range all {
+				if c.ID() == want {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("DefaultRegistry missing shipment check %q", want)
+			}
 		}
 	})
 }

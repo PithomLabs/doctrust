@@ -1,0 +1,59 @@
+{
+  "domain": "shipment_release",
+  "documents": [
+    {
+      "type": "bill_of_lading",
+      "filename": "03-bill-of-lading.pdf",
+      "status": "extracted",
+      "fields": [
+        "bill_of_lading_number",
+        "container_number",
+        "gross_weight",
+        "seal_number"
+      ],
+      "citations": 4,
+      "page_count": 1
+    },
+    {
+      "type": "certificate_of_origin",
+      "filename": "04-certificate-of-origin.pdf",
+      "status": "extracted",
+      "fields": [
+        "certificate_number",
+        "container_number",
+        "seal_number",
+        "total_gross_weight"
+      ],
+      "citations": 4,
+      "page_count": 1
+    },
+    {
+      "type": "commercial_invoice",
+      "filename": "01-commercial-invoice.pdf",
+      "status": "extracted",
+      "fields": [
+        "container_number",
+        "invoice_number",
+        "seal_number",
+        "shipment_id",
+        "total_gross_weight"
+      ],
+      "citations": 5,
+      "page_count": 1
+    },
+    {
+      "type": "packing_list",
+      "filename": "02-packing-list.pdf",
+      "status": "extracted",
+      "fields": [
+        "container_number",
+        "packing_list_number",
+        "seal_number",
+        "total_gross_weight"
+      ],
+      "citations": 4,
+      "page_count": 2
+    }
+  ],
+  "started_at": "2026-08-24T07:48:09.648011685Z"
+}

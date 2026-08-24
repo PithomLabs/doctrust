@@ -1,0 +1,22 @@
+id: shipment_release
+version: "1"
+checks:
+    - id: required_shipment_documents
+      version: "1.0"
+      params:
+        required:
+            - commercial_invoice
+            - packing_list
+            - certificate_of_origin
+            - bill_of_lading
+    - id: gross_weight_reconciliation
+      version: "1.0"
+      params:
+        condition: all_equal
+        semantic_type: shipment.gross_weight
+        sources:
+            - commercial_invoice
+            - packing_list
+            - certificate_of_origin
+            - bill_of_lading
+        unit: KG

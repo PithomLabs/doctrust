@@ -1,0 +1,35 @@
+{
+  "id": "shipment_release",
+  "version": "1",
+  "checks": [
+    {
+      "ID": "required_shipment_documents",
+      "Version": "1.0",
+      "Params": {
+        "required": [
+          "commercial_invoice",
+          "packing_list",
+          "certificate_of_origin",
+          "bill_of_lading"
+        ]
+      }
+    },
+    {
+      "ID": "gross_weight_reconciliation",
+      "Version": "1.0",
+      "Params": {
+        "condition": "all_equal",
+        "semantic_type": "shipment.gross_weight",
+        "sources": [
+          "commercial_invoice",
+          "packing_list",
+          "certificate_of_origin",
+          "bill_of_lading"
+        ],
+        "unit": "KG"
+      }
+    }
+  ],
+  "hash": "d3f1a945867942c369295ce4105e070d16e7e2defce00d4d80aa4f72d934f834",
+  "promoted_at": "2026-08-24T07:32:00.573245719Z"
+}

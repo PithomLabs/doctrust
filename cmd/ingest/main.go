@@ -62,8 +62,16 @@ var schemas = map[nutrient.DocumentType]map[string]any{
 }
 
 func main() {
+	if isShipmentInvocation(os.Args[1:]) {
+		if err := runShipmentMode(os.Args[1:]); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) < 2 {
 		fmt.Fprintf(os.Stderr, "Usage: %s <directory>\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "   or: %s -domain shipment_release -docs type=path[,type=path] [--extend-from snap.json]\n", os.Args[0])
 		os.Exit(1)
 	}
 	dir := os.Args[1]

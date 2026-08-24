@@ -10,4 +10,10 @@ const (
 	DocType1040     DocumentType = "form_1040"
 	DocTypeBankStmt DocumentType = "bank_statement"
 	DocTypeUnknown  DocumentType = "unknown"
+
+	// Trade-document domain (shipment_release).
+	DocTypeCommercialInvoice   DocumentType = "commercial_invoice"
+	DocTypePackingList         DocumentType = "packing_list"
+	DocTypeBillOfLading        DocumentType = "bill_of_lading"
+	DocTypeCertificateOfOrigin DocumentType = "certificate_of_origin"
 )

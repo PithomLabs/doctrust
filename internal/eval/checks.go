@@ -7,5 +7,7 @@ func DefaultRegistry() *CheckRegistry {
 	r.Register(&GrossIncomeConsistencyCheck{})
 	r.Register(&RequiredDocumentsCheck{})
 	r.Register(&NetVsGrossIncomparabilityCheck{})
+	r.Register(&GrossWeightReconciliationCheck{})
+	r.Register(&RequiredShipmentDocumentsCheck{})
 	return r
 }

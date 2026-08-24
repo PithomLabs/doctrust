@@ -37,6 +37,7 @@ type RulesetInfo struct {
 
 type DocTrustService struct {
 	mu          sync.Mutex
+	domain      string
 	runner      *eval.Runner
 	ruleset     eval.Ruleset
 	rulesetHash string
@@ -55,6 +56,7 @@ func NewDocTrustService(domain, rulesetsDir string) (*DocTrustService, error) {
 	}
 	runner := eval.NewRunner(eval.DefaultRegistry().All())
 	return &DocTrustService{
+		domain:      domain,
 		runner:      runner,
 		ruleset:     rs,
 		rulesetHash: rHash,
@@ -203,7 +205,7 @@ func (s *DocTrustService) BuildArtifact() (*audit.Artifact, error) {
 		return nil, fmt.Errorf("case not evaluated")
 	}
 
-	artifact := audit.NewArtifact("income_verification", s.case_.policyHash)
+	artifact := audit.NewArtifact(s.domain, s.case_.policyHash) // D7: configured domain (was literal "income_verification")
 	artifact.SetRuleset(s.case_.ruleset.ID, s.case_.ruleset.Version, s.case_.rulesetHash)
 
 	for _, doc := range s.case_.snapshot.Documents {

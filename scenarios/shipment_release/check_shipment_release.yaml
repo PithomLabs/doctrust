@@ -1,0 +1,219 @@
+scenarios:
+  - name: "all_four_agree_pass"
+    origin: "real_fixture"
+    input:
+      facts:
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "commercial_invoice"
+          field: "total_gross_weight"
+          value: 4650.0
+          source_span: "page=1;bbox=[512,340,50,10]"
+          confidence: 0.97
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "packing_list"
+          field: "total_gross_weight"
+          value: 4650.0
+          source_span: "page=2;bbox=[439,464,54,11]"
+          confidence: 0.96
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "certificate_of_origin"
+          field: "total_gross_weight"
+          value: 4650.0
+          source_span: "page=1;bbox=[468,312,81,12]"
+          confidence: 0.96
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "bill_of_lading"
+          field: "gross_weight"
+          value: 4650.0
+          source_span: "page=1;bbox=[430,278,96,14]"
+          confidence: 0.95
+    params:
+      required:
+        - commercial_invoice
+        - packing_list
+        - certificate_of_origin
+        - bill_of_lading
+    expected:
+      check_id: "gross_weight_reconciliation"
+      status: "PASS"
+      severity: "INFO"
+      reason: "gross weight reconciles across 4 documents (4650.00 KG)"
+      evidence:
+        - field: "shipment.gross_weight"
+          source_doc: "commercial_invoice"
+        - field: "shipment.gross_weight"
+          source_doc: "packing_list"
+        - field: "shipment.gross_weight"
+          source_doc: "certificate_of_origin"
+        - field: "shipment.gross_weight"
+          source_doc: "bill_of_lading"
+      metrics:
+        condition: "all_equal"
+        unit: "KG"
+
+  - name: "bl_outlier_review"
+    origin: "real_fixture"
+    input:
+      facts:
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "commercial_invoice"
+          field: "total_gross_weight"
+          value: 4650.0
+          source_span: "page=1;bbox=[512,340,50,10]"
+          confidence: 0.97
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "packing_list"
+          field: "total_gross_weight"
+          value: 4650.0
+          source_span: "page=2;bbox=[439,464,54,11]"
+          confidence: 0.96
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "certificate_of_origin"
+          field: "total_gross_weight"
+          value: 4650.0
+          source_span: "page=1;bbox=[468,312,81,12]"
+          confidence: 0.96
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "bill_of_lading"
+          field: "gross_weight"
+          value: 5150.0
+          source_span: "page=1;bbox=[430,278,96,14]"
+          confidence: 0.95
+    params:
+      required:
+        - commercial_invoice
+        - packing_list
+        - certificate_of_origin
+        - bill_of_lading
+    expected:
+      check_id: "gross_weight_reconciliation"
+      status: "REVIEW"
+      severity: "BLOCKING"
+      reason: "gross weight reconciliation failed: commercial_invoice, packing_list, certificate_of_origin, bill_of_lading differ (commercial_invoice=4650.00 KG, packing_list=4650.00 KG, certificate_of_origin=4650.00 KG, bill_of_lading=5150.00 KG); outliers: bill_of_lading"
+      evidence:
+        - field: "shipment.gross_weight"
+          source_doc: "commercial_invoice"
+          confidence: 0.97
+        - field: "shipment.gross_weight"
+          source_doc: "packing_list"
+          confidence: 0.96
+        - field: "shipment.gross_weight"
+          source_doc: "certificate_of_origin"
+          confidence: 0.96
+        - field: "shipment.gross_weight"
+          source_doc: "bill_of_lading"
+          confidence: 0.95
+
+  - name: "partial_evidence_insufficient"
+    origin: "human_adversarial"
+    input:
+      facts:
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "commercial_invoice"
+          field: "total_gross_weight"
+          value: 4650.0
+          source_span: "page=1;bbox=[512,340,50,10]"
+          confidence: 0.97
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "bill_of_lading"
+          field: "gross_weight"
+          value: 5150.0
+          source_span: "page=1;bbox=[430,278,96,14]"
+          confidence: 0.95
+    params:
+      required:
+        - commercial_invoice
+        - packing_list
+        - certificate_of_origin
+        - bill_of_lading
+    expected:
+      check_id: "gross_weight_reconciliation"
+      status: "REVIEW"
+      severity: "BLOCKING"
+      reason: "insufficient evidence for shipment.gross_weight: missing sources certificate_of_origin, packing_list"
+      evidence:
+        - field: "shipment.gross_weight"
+          source_doc: "commercial_invoice"
+        - field: "shipment.gross_weight"
+          source_doc: "bill_of_lading"
+
+  - name: "single_document_insufficient"
+    origin: "human_adversarial"
+    input:
+      facts:
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "commercial_invoice"
+          field: "total_gross_weight"
+          value: 4650.0
+          source_span: "page=1;bbox=[512,340,50,10]"
+          confidence: 0.97
+    params:
+      required:
+        - commercial_invoice
+        - packing_list
+        - certificate_of_origin
+        - bill_of_lading
+    expected:
+      check_id: "required_shipment_documents"
+      status: "REVIEW"
+      severity: "BLOCKING"
+      reason: "insufficient evidence: 1 of 4 required shipment documents present; missing: bill_of_lading, certificate_of_origin, packing_list"
+
+  - name: "empty_facts_insufficient"
+    origin: "human_adversarial"
+    input:
+      facts: []
+    params: {}
+    expected:
+      check_id: "required_shipment_documents"
+      status: "REVIEW"
+      severity: "BLOCKING"
+      reason: "insufficient evidence: 0 of 4 required shipment documents present; missing: bill_of_lading, certificate_of_origin, commercial_invoice, packing_list"
+
+  - name: "conflicting_duplicate_within_source"
+    origin: "ai"
+    input:
+      facts:
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "commercial_invoice"
+          field: "total_gross_weight"
+          value: 4650.0
+          source_span: "page=1;bbox=[512,340,50,10]"
+          confidence: 0.97
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "packing_list"
+          field: "total_gross_weight"
+          value: 4650.0
+          source_span: "page=2;bbox=[439,464,54,11]"
+          confidence: 0.96
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "certificate_of_origin"
+          field: "total_gross_weight"
+          value: 4650.0
+          source_span: "page=1;bbox=[468,312,81,12]"
+          confidence: 0.96
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "bill_of_lading"
+          field: "gross_weight"
+          value: 4650.0
+          source_span: "page=1;bbox=[430,278,96,14]"
+          confidence: 0.95
+        - semantic_type: "shipment.gross_weight"
+          source_doc: "bill_of_lading"
+          field: "gross_weight_annotation"
+          value: 5150.0
+          source_span: "page=1;bbox=[430,296,96,14]"
+          confidence: 0.61
+    params:
+      required:
+        - commercial_invoice
+        - packing_list
+        - certificate_of_origin
+        - bill_of_lading
+    expected:
+      check_id: "gross_weight_reconciliation"
+      status: "REVIEW"
+      severity: "BLOCKING"
+      reason: "conflicting shipment.gross_weight observations within source \"bill_of_lading\""
+      evidence:
+        - field: "shipment.gross_weight"

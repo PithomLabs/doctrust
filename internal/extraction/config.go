@@ -73,7 +73,62 @@ func IncomeVerificationConfigs() map[types.DocumentType]ExtractionConfig {
 	}
 }
 
-// ParseCurrencyValue parses a currency string (e.g., "$120,000") into a float64.
+// ShipmentReleaseConfigs returns the extraction configs for the
+// shipment_release domain. All four trade documents expose their gross weight
+// under the same semantic type so the reconciliation check sees one
+// comparable fact family. Identity fields are captured per document for
+// provenance and cross-document corroboration reporting.
+func ShipmentReleaseConfigs() map[types.DocumentType]ExtractionConfig {
+	gw := func() FieldNormalization {
+		return FieldNormalization{SemanticType: "shipment.gross_weight", ValueType: "currency"}
+	}
+	return map[types.DocumentType]ExtractionConfig{
+		types.DocTypeCommercialInvoice: {
+			DocumentType: "commercial_invoice",
+			FieldMapping: map[string]FieldNormalization{
+				"total_gross_weight": gw(),
+				"invoice_number":     {SemanticType: "shipment.invoice_reference", ValueType: "string"},
+				"shipment_id":        {SemanticType: "shipment.reference", ValueType: "string"},
+				"container_number":   {SemanticType: "shipment.container", ValueType: "string"},
+				"seal_number":        {SemanticType: "shipment.seal", ValueType: "string"},
+			},
+		},
+		types.DocTypePackingList: {
+			DocumentType: "packing_list",
+			FieldMapping: map[string]FieldNormalization{
+				"total_gross_weight": gw(),
+				"packing_list_number": {SemanticType: "shipment.packing_list_reference",
+					ValueType: "string"},
+				"container_number": {SemanticType: "shipment.container", ValueType: "string"},
+				"seal_number":      {SemanticType: "shipment.seal", ValueType: "string"},
+			},
+		},
+		types.DocTypeBillOfLading: {
+			DocumentType: "bill_of_lading",
+			FieldMapping: map[string]FieldNormalization{
+				"gross_weight":    gw(),
+				"bill_of_lading_number": {SemanticType: "shipment.bill_of_lading_reference",
+					ValueType: "string"},
+				"container_number": {SemanticType: "shipment.container", ValueType: "string"},
+				"seal_number":      {SemanticType: "shipment.seal", ValueType: "string"},
+			},
+		},
+		types.DocTypeCertificateOfOrigin: {
+			DocumentType: "certificate_of_origin",
+			FieldMapping: map[string]FieldNormalization{
+				"total_gross_weight": gw(),
+				"certificate_number": {SemanticType: "shipment.certificate_reference",
+					ValueType: "string"},
+				"container_number": {SemanticType: "shipment.container", ValueType: "string"},
+				"seal_number":      {SemanticType: "shipment.seal", ValueType: "string"},
+			},
+		},
+	}
+}
+
+// ParseCurrencyValue parses a currency or mass string (e.g., "$120,000",
+// "4,650.00 KG") into a float64. Trailing unit tokens are formatting, not
+// semantics, and are stripped before the numeric parse.
 func ParseCurrencyValue(v any) any {
 	s, ok := v.(string)
 	if !ok {
@@ -82,6 +137,16 @@ func ParseCurrencyValue(v any) any {
 	s = strings.ReplaceAll(s, "$", "")
 	s = strings.ReplaceAll(s, ",", "")
 	s = strings.TrimSpace(s)
+	upper := strings.ToUpper(s)
+	for _, unit := range []string{"KG", "CBM", "PCS"} {
+		if strings.HasSuffix(upper, " "+unit) {
+			s = strings.TrimSpace(s[:len(s)-len(unit)-1])
+			break
+		}
+		if upper == unit {
+			return v
+		}
+	}
 	if f, err := strconv.ParseFloat(s, 64); err == nil {
 		return f
 	}

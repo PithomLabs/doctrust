@@ -127,6 +127,11 @@ const (
 	DocType1040     = types.DocType1040
 	DocTypeBankStmt = types.DocTypeBankStmt
 	DocTypeUnknown  = types.DocTypeUnknown
+
+	DocTypeCommercialInvoice   = types.DocTypeCommercialInvoice
+	DocTypePackingList         = types.DocTypePackingList
+	DocTypeBillOfLading        = types.DocTypeBillOfLading
+	DocTypeCertificateOfOrigin = types.DocTypeCertificateOfOrigin
 )
 
 // ExtractionResult holds the full extraction output for a single document.

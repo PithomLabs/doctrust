@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/doctrust/doctrust/internal/review"
@@ -257,7 +258,7 @@ func TestDocTrustService_BuildArtifact_ReviewDisposition(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildArtifact: %v", err)
 	}
- dispositionBefore := artifact.FinalDisposition
+	dispositionBefore := artifact.FinalDisposition
 
 	// Add a review
 	svc.RequestHumanReview(0, review.ActionConfirm, "approved")
@@ -445,5 +446,49 @@ func TestDocTrustService_SnapshotDocumentsInFactMapping(t *testing.T) {
 	}
 	if projected[0].SourceDoc != string(types.DocTypePaystub) {
 		t.Errorf("SourceDoc = %q, want %q", projected[0].SourceDoc, types.DocTypePaystub)
+	}
+}
+
+// TestDocTrustService_BuildArtifact_DomainThreaded (plan10 D7): the artifact
+// policy_id must come from the CONFIGURED domain, not a hardcoded literal.
+// The income path keeps the same value as before (byte-identical artifacts);
+// a shipment_release service must stamp shipment_release.
+func TestDocTrustService_BuildArtifact_DomainThreaded(t *testing.T) {
+	// Provision a minimal promoted ruleset for the shipment domain.
+	rsDir := filepath.Join(t.TempDir(), "rulesets", "shipment_release")
+	if err := os.MkdirAll(rsDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	v1 := "id: shipment_release\nversion: \"1\"\nchecks:\n    - id: required_shipment_documents\n      version: \"1.0\"\n"
+	if err := os.WriteFile(filepath.Join(rsDir, "v1.yaml"), []byte(v1), 0o644); err != nil {
+		t.Fatalf("write v1.yaml: %v", err)
+	}
+
+	svc, err := NewDocTrustService("shipment_release", filepath.Dir(rsDir))
+	if err != nil {
+		t.Fatalf("NewDocTrustService(shipment_release): %v", err)
+	}
+
+	snapshotPath := filepath.Join(t.TempDir(), "evidence_snapshot.json")
+	snap := strings.Replace(testSnapshotJSON, `"case_id": "income_verification_001"`, `"case_id": "shipment_test"`, 1)
+	if err := os.WriteFile(snapshotPath, []byte(snap), 0o644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+	ctx := context.Background()
+	if err := svc.LoadCase(ctx, snapshotPath); err != nil {
+		t.Fatalf("LoadCase: %v", err)
+	}
+	if _, err := svc.Evaluate(ctx); err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	artifact, err := svc.BuildArtifact()
+	if err != nil {
+		t.Fatalf("BuildArtifact: %v", err)
+	}
+	if artifact.PolicyID != "shipment_release" {
+		t.Fatalf("PolicyID = %q, want shipment_release (D7)", artifact.PolicyID)
+	}
+	if artifact.RulesetID != "shipment_release" {
+		t.Fatalf("RulesetID = %q, want shipment_release", artifact.RulesetID)
 	}
 }

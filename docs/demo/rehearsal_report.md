@@ -276,3 +276,40 @@ model selection, retries, or free-tier failures unless asked.
    this LLM-free critical path.
 
 # FREEZE DEMO — presentation-only from here. No further engineering.
+
+---
+
+# Screenshot Package (plans8/prompt4.md) — captured 2026-08-23
+
+Single fresh source run of the frozen `scripts/judge-demo.sh` (log preserved at
+`/tmp/judge-demo-capture-231830/`). Six act-scoped slices rendered as high-res
+monospace PNGs (ANSI-stripped, 2x scale, secret/temp-path scanned). Canonical:
+`docs/demo/screenshots/` · byte-identical mirror: `plans8/screenshots/`.
+
+## Source run
+
+- Command: `bash scripts/judge-demo.sh`
+- Ruleset: income_verification **v2** (asserted == promoted latest pre-Acts)
+- Case ID: `e14895b79cd1365c`
+- Decision: REVIEW/WARNING · findings=3
+- Captured: 2026-08-23 evening (see screenshots README header timestamp)
+
+## Coverage
+
+| Act | Screenshot | Captured |
+|---|---|---|
+| 1 Evaluate | 01-evaluate-case.png | YES |
+| 2 Evidence | 02-finding-and-evidence.png (+ real web-UI attempt attempted; terminal render canonical) | YES |
+| 3 Human review | 03-human-review.png | YES |
+| 4 Audit artifact | 04-audit-artifact.png | YES |
+| 5 Policy rejection | 05-policy-rejection.png (semantic row + DEMO FIXTURE label + BLOCKED) | YES |
+| 6 Promotion defense | 06-promotion-defense.png (Gate 5 + SHA equality + v2 intact) | YES |
+
+## Quality confirmation
+
+No secrets · no temp/sandbox identifiers in crops · all values live-parsed from the
+single source run · dimensions ≥800×200 (2x monospace, presentation-legible) · mirror
+byte-identical (`diff -r` clean) · git status shows only intended screenshot assets,
+capture tooling, and this addendum. Frozen demo and engine untouched.
+
+**Presentation assets frozen. STOP.**
