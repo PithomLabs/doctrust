@@ -16,9 +16,15 @@ import (
 
 func main() {
 	snapshotRoot := flag.String("snapshot-root", "", "allowed root for snapshot and document paths (env: DOCTRUST_SNAPSHOT_ROOT, default: cwd)")
+	envFile := flag.String("env-file", "", "optional .env file parsed at runtime for provider credentials (values never logged; keeps secrets out of MCP registration config)")
 	flag.Parse()
 
 	root := resolveRoot(*snapshotRoot)
+	envPath := *envFile
+	if envPath == "" {
+		envPath = defaultEnvFileNearExecutable()
+	}
+	loadEnvFile(envPath)
 
 	server := mcp.NewServer(
 		&mcp.Implementation{Name: "evidence-mcp", Version: "0.1.0"},

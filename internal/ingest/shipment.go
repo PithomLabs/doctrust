@@ -335,3 +335,46 @@ func deriveShipmentCaseID(g *evidence.EvidenceGraph) string {
 	sum := sha256.Sum256(blob)
 	return fmt.Sprintf("shipment_%x", sum[:8])
 }
+
+// ProvenanceRecord documents the chain between an extended snapshot and the
+// base it was built from (plan11 P5-5). Written as a sidecar JSON next to the
+// extended snapshot; the frozen EvidenceGraph schema is unchanged.
+type ProvenanceRecord struct {
+	PreviousCaseID       string            `json:"previous_case_id"`
+	PreviousSnapshotSha  string            `json:"previous_snapshot_sha256"`
+	PreviousSnapshotPath string            `json:"previous_snapshot_path"`
+	AddedDocuments       map[string]string `json:"added_documents"`
+	ExtendedAt           time.Time         `json:"extended_at"`
+}
+
+// WriteProvenance writes <snapshot>.provenance.json describing the chain from
+// previousSnapshotPath to snapshotPath.
+func WriteProvenance(snapshotPath, previousSnapshotPath string, added map[types.DocumentType]string) (string, error) {
+	prevBytes, err := os.ReadFile(previousSnapshotPath)
+	if err != nil {
+		return "", fmt.Errorf("read previous snapshot: %w", err)
+	}
+	sum := sha256.Sum256(prevBytes)
+	addedStr := map[string]string{}
+	for t, p := range added {
+		addedStr[string(t)] = p
+	}
+	rec := ProvenanceRecord{
+		PreviousSnapshotSha:  fmt.Sprintf("%x", sum),
+		PreviousSnapshotPath: previousSnapshotPath,
+		AddedDocuments:       addedStr,
+		ExtendedAt:           time.Now().UTC(),
+	}
+	if prev, err := LoadSnapshot(previousSnapshotPath); err == nil {
+		rec.PreviousCaseID = prev.CaseID
+	}
+	data, err := json.MarshalIndent(rec, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	path := snapshotPath + ".provenance.json"
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
+}

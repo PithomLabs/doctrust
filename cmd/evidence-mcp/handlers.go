@@ -78,16 +78,20 @@ func knownShipmentType(t string) bool {
 }
 
 func extractionKey() (string, error) {
-	if k := os.Getenv("NUTRIENT_DWS_EXTRACTION_API_KEY"); k != "" {
+	if k := lookupCred("NUTRIENT_DWS_EXTRACTION_API_KEY"); k != "" {
 		return k, nil
 	}
-	return "", fmt.Errorf("NUTRIENT_DWS_EXTRACTION_API_KEY not set")
+	if k := lookupCred("extraction_apikey"); k != "" {
+		return k, nil
+	}
+	return "", fmt.Errorf("NUTRIENT_DWS_EXTRACTION_API_KEY not set (env or --env-file)")
 }
 
 type snapshotOutput struct {
 	SnapshotPath    string                  `json:"snapshot_path"`
 	CaseID          string                  `json:"case_id"`
 	PreviousCaseID  string                  `json:"previous_case_id,omitempty"`
+	ProvenancePath  string                  `json:"provenance_path,omitempty"`
 	DocumentCount   int                     `json:"document_count"`
 	ClaimCount      int                     `json:"claim_count"`
 	ExtractionState []ingest.DocumentResult `json:"extraction_documents"`
@@ -240,15 +244,23 @@ func registerTools(server *mcp.Server, root string) {
 			if err != nil {
 				return errResult("INTERNAL_ERROR", err.Error()), nil
 			}
+			provPath, perr := ingest.WriteProvenance(path, base, typed)
+			if perr != nil {
+				slog.Warn("provenance sidecar write failed", "error", perr)
+			}
 			writeReport(report, outDir, "extended_")
-			return okResult(snapshotOutput{
+			out := snapshotOutput{
 				SnapshotPath:    path,
 				CaseID:          graph.CaseID,
 				PreviousCaseID:  prevID,
 				DocumentCount:   len(graph.Documents),
 				ClaimCount:      len(graph.Claims),
 				ExtractionState: report.Documents,
-			}), nil
+			}
+			if provPath != "" {
+				out.ProvenancePath = provPath
+			}
+			return okResult(out), nil
 		})()
 	})
 }

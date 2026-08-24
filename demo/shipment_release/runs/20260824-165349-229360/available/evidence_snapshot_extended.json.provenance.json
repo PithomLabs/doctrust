@@ -1,0 +1,10 @@
+{
+  "previous_case_id": "shipment_3a2ea0ec5ce1a41b",
+  "previous_snapshot_sha256": "a8de0fd8ad216d6b10bdbf09178bb38a994c14090bf6a2a342ab3d63b662e02a",
+  "previous_snapshot_path": "/home/chaschel/Desktop/biz/nutrient/doctrust/demo/shipment_release/runs/20260824-165349-229360/available/evidence_snapshot.json",
+  "added_documents": {
+    "certificate_of_origin": "/home/chaschel/Desktop/biz/nutrient/doctrust/demo/shipment_release/runs/20260824-165349-229360/available/04-certificate-of-origin.pdf",
+    "packing_list": "/home/chaschel/Desktop/biz/nutrient/doctrust/demo/shipment_release/runs/20260824-165349-229360/available/02-packing-list.pdf"
+  },
+  "extended_at": "2026-08-24T08:57:20.551730728Z"
+}

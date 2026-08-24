@@ -1,0 +1,32 @@
+{
+  "domain": "shipment_release",
+  "documents": [
+    {
+      "type": "certificate_of_origin",
+      "filename": "04-certificate-of-origin.pdf",
+      "status": "extracted",
+      "fields": [
+        "certificate_number",
+        "container_number",
+        "seal_number",
+        "total_gross_weight"
+      ],
+      "citations": 4,
+      "page_count": 1
+    },
+    {
+      "type": "packing_list",
+      "filename": "02-packing-list.pdf",
+      "status": "extracted",
+      "fields": [
+        "container_number",
+        "packing_list_number",
+        "seal_number",
+        "total_gross_weight"
+      ],
+      "citations": 4,
+      "page_count": 2
+    }
+  ],
+  "started_at": "2026-08-24T08:57:05.856860896Z"
+}

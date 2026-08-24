@@ -1,0 +1,63 @@
+**Compliance Check Complete**
+
+**Artifacts checked:**
+- `01-commercial-invoice.pdf` (commercial_invoice) — extracted successfully with 5 fields, 5 citations
+- `03-bill-of-lading.pdf` (bill_of_lading) — extracted successfully with 4 fields, 4 citations
+
+**Policy evaluated:** `shipment_release` v1 (ruleset checks: `required_shipment_documents` v1.0, `gross_weight_reconciliation` v1.0)
+
+**DocTrust disposition:** **REVIEW** (BLOCKING severity)
+
+**Findings:**
+
+| Check | Status | Reason |
+|-------|--------|--------|
+| `required_shipment_documents` | REVIEW | **2 of 4 required documents present**; missing: `certificate_of_origin`, `packing_list` |
+| `gross_weight_reconciliation` | REVIEW | **Insufficient evidence for gross weight reconciliation**; missing sources: `certificate_of_origin`, `packing_list` (need 4 sources, only 2 present) |
+
+**Evidence snapshot:** `/home/chaschel/Desktop/biz/nutrient/doctrust/demo/shipment_release/runs/20260824-165349-229360/available/evidence_snapshot.json`
+
+**Case/Audit ID:** `a8de0fd8ad216d6b`
+
+---
+
+**Conclusion:** The two documents you provided (commercial invoice + bill of lading) are **not sufficient** to satisfy the approved `shipment_release` policy. The policy requires **four** shipment documents total — you're missing the **certificate of origin** and **packing list**. Both checks returned REVIEW with BLOCKING severity because required evidence sources are absent.
+
+**Next step (permitted follow-up):** Obtain the missing documents (`certificate_of_origin` and `packing_list`), add them to the evidence snapshot via `extend_evidence_snapshot`, then re-evaluate with DocTrust.
+**Compliance Check Complete — Extended Evidence**
+
+**New documents added:**
+- `02-packing-list.pdf` (packing_list) — extracted successfully with 4 fields, 4 citations
+- `04-certificate-of-origin.pdf` (certificate_of_origin) — extracted successfully with 4 fields, 4 citations
+
+**Policy evaluated:** `shipment_release` v1 (ruleset checks: `required_shipment_documents` v1.0, `gross_weight_reconciliation` v1.0)
+
+**DocTrust disposition:** **REVIEW** (BLOCKING severity)
+
+**Findings:**
+
+| Check | Status | Reason |
+|-------|--------|--------|
+| `required_shipment_documents` | **PASS** | all 4 required shipment documents present |
+| `gross_weight_reconciliation` | **REVIEW** | gross weight reconciliation failed: commercial_invoice, packing_list, certificate_of_origin, bill_of_lading differ (commercial_invoice=4650.00 KG, packing_list=4650.00 KG, certificate_of_origin=4650.00 KG, bill_of_lading=5150.00 KG); outliers: bill_of_lading |
+
+**Evidence snapshot:** `/home/chaschel/Desktop/biz/nutrient/doctrust/demo/shipment_release/runs/20260824-165349-229360/available/evidence_snapshot_extended.json`
+
+**Case/Audit ID:** `1efb11169d1fa137`
+
+**Audit artifact hash:** `3bf036f50ff33ac624e3bb8fbb608a1df0dcbabc50d84c50ca98433ccc37f460`
+
+---
+
+**Conclusion:**
+The `required_shipment_documents` check now **PASSES** — all four required documents are present (commercial invoice, bill of lading, packing list, certificate of origin).
+
+However, the `gross_weight_reconciliation` check returns **REVIEW with BLOCKING severity** because the gross weights across the four documents do not all match:
+- Commercial invoice: **4,650 KG**
+- Packing list: **4,650 KG**
+- Certificate of origin: **4,650 KG**
+- **Bill of lading: 5,150 KG** (outlier)
+
+Three documents agree on 4,650 KG; the bill of lading shows 5,150 KG. The policy requires all sources to be equal for gross weight reconciliation.
+
+**Next step (per policy):** This REVIEW disposition with BLOCKING severity must be escalated to human authority. The evidence and findings have been surfaced above; the case/audit ID is `1efb11169d1fa137`.

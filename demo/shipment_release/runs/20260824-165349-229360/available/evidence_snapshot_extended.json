@@ -1,0 +1,533 @@
+{
+  "case_id": "shipment_33617040a4a1695e",
+  "documents": [
+    {
+      "id": "doc_bill_of_lading",
+      "filename": "03-bill-of-lading.pdf",
+      "hash": "1ceeb658b1040b3bfe2fe67f177b82cc59af6d784a8ff4a5256eddec3ad8767b",
+      "type": "bill_of_lading"
+    },
+    {
+      "id": "doc_commercial_invoice",
+      "filename": "01-commercial-invoice.pdf",
+      "hash": "5d92458aeec03c4856cc9cafd3a4b79f300d657160d1d6d0520956ee0bc3b7dd",
+      "type": "commercial_invoice"
+    },
+    {
+      "id": "doc_certificate_of_origin",
+      "filename": "04-certificate-of-origin.pdf",
+      "hash": "e60eaf0e6b8eb239135a0749171581973f7b3481aa5cf7da276fb5b06076faef",
+      "type": "certificate_of_origin"
+    },
+    {
+      "id": "doc_packing_list",
+      "filename": "02-packing-list.pdf",
+      "hash": "950f1a5a1b2ba11c5a1a73d859c7a85f994c64964abe71a531269398e82e5be9",
+      "type": "packing_list"
+    }
+  ],
+  "claims": [
+    {
+      "id": "bill_of_lading.bill_of_lading_number",
+      "field": "bill_of_lading_number",
+      "semantic_type": "shipment.bill_of_lading_reference",
+      "value": "MSL-620984110",
+      "value_type": "string",
+      "sources": [
+        {
+          "document_id": "doc_bill_of_lading",
+          "filename": "03-bill-of-lading.pdf",
+          "page": 1,
+          "bbox": [
+            497.88,
+            57.96,
+            59.76,
+            6.84
+          ],
+          "confidence": 0.95,
+          "field_name": "bill_of_lading_number"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "bill_of_lading.container_number",
+      "field": "container_number",
+      "semantic_type": "shipment.container",
+      "value": "TCKU-918234-0",
+      "value_type": "string",
+      "sources": [
+        {
+          "document_id": "doc_bill_of_lading",
+          "filename": "03-bill-of-lading.pdf",
+          "page": 1,
+          "bbox": [
+            52.919999999999995,
+            288,
+            65.88,
+            7.92
+          ],
+          "confidence": 0.95,
+          "field_name": "container_number"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "bill_of_lading.gross_weight",
+      "field": "gross_weight",
+      "semantic_type": "shipment.gross_weight",
+      "value": 5150,
+      "value_type": "currency",
+      "sources": [
+        {
+          "document_id": "doc_bill_of_lading",
+          "filename": "03-bill-of-lading.pdf",
+          "page": 1,
+          "bbox": [
+            459,
+            288,
+            50.4,
+            7.92
+          ],
+          "confidence": 0.95,
+          "field_name": "gross_weight"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "bill_of_lading.seal_number",
+      "field": "seal_number",
+      "semantic_type": "shipment.seal",
+      "value": 850474,
+      "value_type": "string",
+      "sources": [
+        {
+          "document_id": "doc_bill_of_lading",
+          "filename": "03-bill-of-lading.pdf",
+          "page": 1,
+          "bbox": [
+            83.88,
+            299.88,
+            29.88,
+            7.92
+          ],
+          "confidence": 0.95,
+          "field_name": "seal_number"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "certificate_of_origin.certificate_number",
+      "field": "certificate_number",
+      "semantic_type": "shipment.certificate_reference",
+      "value": "CO-PH-2026-08912",
+      "value_type": "string",
+      "sources": [
+        {
+          "document_id": "doc_certificate_of_origin",
+          "filename": "04-certificate-of-origin.pdf",
+          "page": 1,
+          "bbox": [
+            48.953418027828185,
+            99.7152629328773,
+            80.98911070780399,
+            6.839675074818298
+          ],
+          "confidence": 0.95,
+          "field_name": "certificate_number"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "certificate_of_origin.container_number",
+      "field": "container_number",
+      "semantic_type": "shipment.container",
+      "value": "TCKU-918234-0",
+      "value_type": "string",
+      "sources": [
+        {
+          "document_id": "doc_certificate_of_origin",
+          "filename": "04-certificate-of-origin.pdf",
+          "page": 1,
+          "bbox": [
+            361.75136116152447,
+            413.98033347584436,
+            57.95220810647307,
+            5.7597263787943564
+          ],
+          "confidence": 0.95,
+          "field_name": "container_number"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "certificate_of_origin.seal_number",
+      "field": "seal_number",
+      "semantic_type": "shipment.seal",
+      "value": 850474,
+      "value_type": "string",
+      "sources": [
+        {
+          "document_id": "doc_certificate_of_origin",
+          "filename": "04-certificate-of-origin.pdf",
+          "page": 1,
+          "bbox": [
+            455.6987295825771,
+            413.98033347584436,
+            26.996370235934663,
+            5.7597263787943564
+          ],
+          "confidence": 0.95,
+          "field_name": "seal_number"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "certificate_of_origin.total_gross_weight",
+      "field": "total_gross_weight",
+      "semantic_type": "shipment.gross_weight",
+      "value": 4650,
+      "value_type": "currency",
+      "sources": [
+        {
+          "document_id": "doc_certificate_of_origin",
+          "filename": "04-certificate-of-origin.pdf",
+          "page": 1,
+          "bbox": [
+            493.8535995160314,
+            380.86190679777684,
+            53.63278886872353,
+            7.91962377084224
+          ],
+          "confidence": 0.95,
+          "field_name": "total_gross_weight"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "commercial_invoice.container_number",
+      "field": "container_number",
+      "semantic_type": "shipment.container",
+      "value": "TCKU-918234-0",
+      "value_type": "string",
+      "sources": [
+        {
+          "document_id": "doc_commercial_invoice",
+          "filename": "01-commercial-invoice.pdf",
+          "page": 1,
+          "bbox": [
+            201.95999999999998,
+            311.76,
+            61.919999999999995,
+            6.84
+          ],
+          "confidence": 0.95,
+          "field_name": "container_number"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "commercial_invoice.invoice_number",
+      "field": "invoice_number",
+      "semantic_type": "shipment.invoice_reference",
+      "value": "INV-2026-1047",
+      "value_type": "string",
+      "sources": [
+        {
+          "document_id": "doc_commercial_invoice",
+          "filename": "01-commercial-invoice.pdf",
+          "page": 1,
+          "bbox": [
+            48.96,
+            97.92,
+            61.919999999999995,
+            6.84
+          ],
+          "confidence": 0.95,
+          "field_name": "invoice_number"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "commercial_invoice.seal_number",
+      "field": "seal_number",
+      "semantic_type": "shipment.seal",
+      "value": 850474,
+      "value_type": "string",
+      "sources": [
+        {
+          "document_id": "doc_commercial_invoice",
+          "filename": "01-commercial-invoice.pdf",
+          "page": 1,
+          "bbox": [
+            230.76,
+            322.92,
+            28.799999999999997,
+            6.84
+          ],
+          "confidence": 0.95,
+          "field_name": "seal_number"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "commercial_invoice.shipment_id",
+      "field": "shipment_id",
+      "semantic_type": "shipment.reference",
+      "value": "PH-EXP-1047",
+      "value_type": "string",
+      "sources": [
+        {
+          "document_id": "doc_commercial_invoice",
+          "filename": "01-commercial-invoice.pdf",
+          "page": 1,
+          "bbox": [
+            174.95999999999998,
+            99.72,
+            48.96,
+            5.76
+          ],
+          "confidence": 0.95,
+          "field_name": "shipment_id"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "commercial_invoice.total_gross_weight",
+      "field": "total_gross_weight",
+      "semantic_type": "shipment.gross_weight",
+      "value": 4650,
+      "value_type": "currency",
+      "sources": [
+        {
+          "document_id": "doc_commercial_invoice",
+          "filename": "01-commercial-invoice.pdf",
+          "page": 1,
+          "bbox": [
+            511.91999999999996,
+            349.91999999999996,
+            50.76,
+            6.84
+          ],
+          "confidence": 0.95,
+          "field_name": "total_gross_weight"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "packing_list.container_number",
+      "field": "container_number",
+      "semantic_type": "shipment.container",
+      "value": "TCKU-918234-0",
+      "value_type": "string",
+      "sources": [
+        {
+          "document_id": "doc_packing_list",
+          "filename": "02-packing-list.pdf",
+          "page": 2,
+          "bbox": [
+            52.473576049804684,
+            103.41147216796874,
+            15.378167724609375,
+            12.009111328125
+          ],
+          "confidence": 0.95,
+          "field_name": "container_number"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "packing_list.packing_list_number",
+      "field": "packing_list_number",
+      "semantic_type": "shipment.packing_list_reference",
+      "value": "PKL-2026-1047",
+      "value_type": "string",
+      "sources": [
+        {
+          "document_id": "doc_packing_list",
+          "filename": "02-packing-list.pdf",
+          "page": 1,
+          "bbox": [
+            49.68,
+            97.92,
+            61.919999999999995,
+            6.84
+          ],
+          "confidence": 0.95,
+          "field_name": "packing_list_number"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "packing_list.seal_number",
+      "field": "seal_number",
+      "semantic_type": "shipment.seal",
+      "value": 850474,
+      "value_type": "string",
+      "sources": [
+        {
+          "document_id": "doc_packing_list",
+          "filename": "02-packing-list.pdf",
+          "page": 1,
+          "bbox": [
+            338.76,
+            231.84,
+            27,
+            6.84
+          ],
+          "confidence": 0.95,
+          "field_name": "seal_number"
+        }
+      ],
+      "status": "singular"
+    },
+    {
+      "id": "packing_list.total_gross_weight",
+      "field": "total_gross_weight",
+      "semantic_type": "shipment.gross_weight",
+      "value": 4650,
+      "value_type": "currency",
+      "sources": [
+        {
+          "document_id": "doc_packing_list",
+          "filename": "02-packing-list.pdf",
+          "page": 2,
+          "bbox": [
+            423,
+            466.91999999999996,
+            33.839999999999996,
+            6.84
+          ],
+          "confidence": 0.95,
+          "field_name": "total_gross_weight"
+        }
+      ],
+      "status": "singular"
+    }
+  ],
+  "relationships": [
+    {
+      "id": "rel_shipment.seal_bill_of_lading.seal_number_commercial_invoice.seal_number",
+      "type": "corroborates",
+      "claim_a": "bill_of_lading.seal_number",
+      "claim_b": "commercial_invoice.seal_number"
+    },
+    {
+      "id": "rel_shipment.seal_bill_of_lading.seal_number_certificate_of_origin.seal_number",
+      "type": "corroborates",
+      "claim_a": "bill_of_lading.seal_number",
+      "claim_b": "certificate_of_origin.seal_number"
+    },
+    {
+      "id": "rel_shipment.seal_bill_of_lading.seal_number_packing_list.seal_number",
+      "type": "corroborates",
+      "claim_a": "bill_of_lading.seal_number",
+      "claim_b": "packing_list.seal_number"
+    },
+    {
+      "id": "rel_shipment.seal_commercial_invoice.seal_number_certificate_of_origin.seal_number",
+      "type": "corroborates",
+      "claim_a": "commercial_invoice.seal_number",
+      "claim_b": "certificate_of_origin.seal_number"
+    },
+    {
+      "id": "rel_shipment.seal_commercial_invoice.seal_number_packing_list.seal_number",
+      "type": "corroborates",
+      "claim_a": "commercial_invoice.seal_number",
+      "claim_b": "packing_list.seal_number"
+    },
+    {
+      "id": "rel_shipment.seal_certificate_of_origin.seal_number_packing_list.seal_number",
+      "type": "corroborates",
+      "claim_a": "certificate_of_origin.seal_number",
+      "claim_b": "packing_list.seal_number"
+    },
+    {
+      "id": "rel_shipment.container_bill_of_lading.container_number_commercial_invoice.container_number",
+      "type": "corroborates",
+      "claim_a": "bill_of_lading.container_number",
+      "claim_b": "commercial_invoice.container_number"
+    },
+    {
+      "id": "rel_shipment.container_bill_of_lading.container_number_certificate_of_origin.container_number",
+      "type": "corroborates",
+      "claim_a": "bill_of_lading.container_number",
+      "claim_b": "certificate_of_origin.container_number"
+    },
+    {
+      "id": "rel_shipment.container_bill_of_lading.container_number_packing_list.container_number",
+      "type": "corroborates",
+      "claim_a": "bill_of_lading.container_number",
+      "claim_b": "packing_list.container_number"
+    },
+    {
+      "id": "rel_shipment.container_commercial_invoice.container_number_certificate_of_origin.container_number",
+      "type": "corroborates",
+      "claim_a": "commercial_invoice.container_number",
+      "claim_b": "certificate_of_origin.container_number"
+    },
+    {
+      "id": "rel_shipment.container_commercial_invoice.container_number_packing_list.container_number",
+      "type": "corroborates",
+      "claim_a": "commercial_invoice.container_number",
+      "claim_b": "packing_list.container_number"
+    },
+    {
+      "id": "rel_shipment.container_certificate_of_origin.container_number_packing_list.container_number",
+      "type": "corroborates",
+      "claim_a": "certificate_of_origin.container_number",
+      "claim_b": "packing_list.container_number"
+    },
+    {
+      "id": "rel_shipment.gross_weight_bill_of_lading.gross_weight_commercial_invoice.total_gross_weight",
+      "type": "corroborates",
+      "claim_a": "bill_of_lading.gross_weight",
+      "claim_b": "commercial_invoice.total_gross_weight"
+    },
+    {
+      "id": "rel_shipment.gross_weight_bill_of_lading.gross_weight_certificate_of_origin.total_gross_weight",
+      "type": "corroborates",
+      "claim_a": "bill_of_lading.gross_weight",
+      "claim_b": "certificate_of_origin.total_gross_weight"
+    },
+    {
+      "id": "rel_shipment.gross_weight_bill_of_lading.gross_weight_packing_list.total_gross_weight",
+      "type": "corroborates",
+      "claim_a": "bill_of_lading.gross_weight",
+      "claim_b": "packing_list.total_gross_weight"
+    },
+    {
+      "id": "rel_shipment.gross_weight_commercial_invoice.total_gross_weight_certificate_of_origin.total_gross_weight",
+      "type": "corroborates",
+      "claim_a": "commercial_invoice.total_gross_weight",
+      "claim_b": "certificate_of_origin.total_gross_weight"
+    },
+    {
+      "id": "rel_shipment.gross_weight_commercial_invoice.total_gross_weight_packing_list.total_gross_weight",
+      "type": "corroborates",
+      "claim_a": "commercial_invoice.total_gross_weight",
+      "claim_b": "packing_list.total_gross_weight"
+    },
+    {
+      "id": "rel_shipment.gross_weight_certificate_of_origin.total_gross_weight_packing_list.total_gross_weight",
+      "type": "corroborates",
+      "claim_a": "certificate_of_origin.total_gross_weight",
+      "claim_b": "packing_list.total_gross_weight"
+    }
+  ],
+  "created_at": "2026-08-24T08:57:20.551275175Z"
+}
