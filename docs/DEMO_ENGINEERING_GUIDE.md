@@ -4,7 +4,7 @@
 
 **Documentation basis**:
 - Source revision documented: `6a0443a2a8e4a0452cbd4c017f137d0523aa323f` (post-scrub HEAD; all prior commit hashes rewritten by `git filter-repo` to remove historical `owner.key.enc` files)
-- Documentation baseline revision: `pending` (this commit)
+- Documentation baseline revision: `f9411ce` (this commit)
 - Frozen execution artifacts:
   - Phase-5: `demo/shipment_release/runs/20260824-185232-341898`
   - Phase-6: `demo/shipment_release/runs/p6-20260825-015819-726232`
