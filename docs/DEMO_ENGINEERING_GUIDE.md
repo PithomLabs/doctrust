@@ -5,7 +5,7 @@
 **Documentation basis**:
 - Source revision documented: `6a0443a2a8e4a0452cbd4c017f137d0523aa323f` (post-scrub HEAD; all prior commit hashes rewritten by `git filter-repo`)
 - History scrub: two `git filter-repo` invocations removed secret-bearing files from reachable history: (1) `.env` + secret value replacement (documented in commit `6c82689` — "A1 hygiene: git filter-repo scrub .env + replace-text for secrets"), verified via pre-scrub backup `.git.backup-20260826/`; (2) `owner.key.enc` removal (prompt10 scrub). No independent secret-scanning tool was available in the execution environment. Secret-history hygiene was verified through full-history path inspection, pre-scrub backup inspection, reflog/unreachable-object verification, and final Git-clone verification.
-- Documentation baseline revision: `f9411ce` (this commit)
+- Documentation baseline revision: `2ce41d5` (this commit)
 - Frozen execution artifacts:
   - Phase-5: `demo/shipment_release/runs/20260824-185232-341898`
   - Phase-6: `demo/shipment_release/runs/p6-20260825-015819-726232`
