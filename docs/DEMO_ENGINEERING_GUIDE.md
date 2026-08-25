@@ -4,7 +4,7 @@
 
 **Documentation basis**:
 - Source revision documented: `c3a6960575f8c24d7bdf5856193e621892a9e780` (commit message: "demo")
-- Documentation baseline revision: `<Commit B SHA — filled in Commit C>`
+- Documentation baseline revision: `be3d17716d4d97801cebab2e925bfd491c21224d`
 - Frozen execution artifacts:
   - Phase-5: `demo/shipment_release/runs/20260824-185232-341898`
   - Phase-6: `demo/shipment_release/runs/p6-20260825-015819-726232`
