@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 const validateSnapCheckID = "validate_snap_check"
@@ -24,7 +24,7 @@ func validCandidateSource() string {
 import (
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 type ValidateSnapCheck struct{}
@@ -159,7 +159,7 @@ func TestValidateSnapshot_ForbiddenImport(t *testing.T) {
 import (
 	"os"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 type ValidateSnapCheck struct{}

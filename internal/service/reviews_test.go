@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/doctrust/doctrust/internal/review"
+	"github.com/PithomLabs/doctrust/internal/review"
 )
 
 // provisionShipmentRuleset creates a minimal promoted ruleset for the test.

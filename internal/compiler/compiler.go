@@ -8,14 +8,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/nutrient"
+	"github.com/PithomLabs/doctrust/internal/nutrient"
 	"gopkg.in/yaml.v3"
 )
 
 type Compiler struct {
-	llmClient    LLMClient
-	adapter      nutrient.NutrientAdapter
-	maxAttempts  int
+	llmClient   LLMClient
+	adapter     nutrient.NutrientAdapter
+	maxAttempts int
 }
 
 type CompileResult struct {
@@ -225,9 +225,9 @@ func computeFixtureSetHash(primaryPath, adversarialPath string) (string, error) 
 	}
 
 	manifest := struct {
-		Version           int    `json:"version"`
-		ExpectedCasesSHA  string `json:"expected_cases_sha256"`
-		AdversarialSHA    string `json:"adversarial_cases_sha256"`
+		Version          int    `json:"version"`
+		ExpectedCasesSHA string `json:"expected_cases_sha256"`
+		AdversarialSHA   string `json:"adversarial_cases_sha256"`
 	}{
 		Version:          1,
 		ExpectedCasesSHA: ComputeHash(primaryBytes),

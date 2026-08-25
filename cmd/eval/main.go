@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/doctrust/doctrust/internal/opa"
+	"github.com/PithomLabs/doctrust/internal/opa"
 )
 
 func main() {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 func shipmentFacts(values map[string]float64) Facts {

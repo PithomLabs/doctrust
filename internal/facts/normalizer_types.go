@@ -1,7 +1,7 @@
 package facts
 
 import (
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 // NormalizedOutput is the result of normalization - Facts + Evidence for the eval engine

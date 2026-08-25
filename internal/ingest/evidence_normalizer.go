@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/evidence"
-	"github.com/doctrust/doctrust/internal/extraction"
-	"github.com/doctrust/doctrust/internal/nutrient"
+	"github.com/PithomLabs/doctrust/internal/evidence"
+	"github.com/PithomLabs/doctrust/internal/extraction"
+	"github.com/PithomLabs/doctrust/internal/nutrient"
 )
 
 // EvidenceNormalizer converts Nutrient extraction output into claims and relationships.

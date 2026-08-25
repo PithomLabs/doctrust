@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doctrust/doctrust/internal/compiler"
+	"github.com/PithomLabs/doctrust/internal/compiler"
 )
 
 func findModuleRoot(t *testing.T) string {
@@ -80,7 +80,7 @@ checks:
 import (
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 type DuplicateProbeCheck struct{}

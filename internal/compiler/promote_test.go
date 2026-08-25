@@ -14,8 +14,8 @@ func TestTransformCandidate_NonAliased(t *testing.T) {
 
 import (
 	"fmt"
-	"github.com/doctrust/doctrust/internal/eval"
-	"github.com/doctrust/doctrust/internal/evidence"
+	"github.com/PithomLabs/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/evidence"
 )
 
 type Check struct{}
@@ -66,8 +66,8 @@ func TestTransformCandidate_Aliased(t *testing.T) {
 	candidate := `package candidate
 
 import (
-	eval "github.com/doctrust/doctrust/internal/eval"
-	"github.com/doctrust/doctrust/internal/evidence"
+	eval "github.com/PithomLabs/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/evidence"
 )
 
 type Check struct{}
@@ -115,8 +115,8 @@ func TestTransformCandidate_GroupedImports(t *testing.T) {
 
 import (
 	"fmt"
-	"github.com/doctrust/doctrust/internal/eval"
-	"github.com/doctrust/doctrust/internal/evidence"
+	"github.com/PithomLabs/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/evidence"
 )
 
 func (c *Check) Evaluate(facts eval.Facts, params map[string]any) eval.Result {
@@ -151,7 +151,7 @@ func (c *Check) Evaluate(facts eval.Facts, params map[string]any) eval.Result {
 func TestTransformCandidate_PreservesCommentsAndStrings(t *testing.T) {
 	candidate := `package candidate
 
-import "github.com/doctrust/doctrust/internal/eval"
+import "github.com/PithomLabs/doctrust/internal/eval"
 
 type Check struct{}
 
@@ -187,7 +187,7 @@ func (c *Check) Evaluate(facts eval.Facts) eval.Result {
 func TestTransformCandidate_Deterministic(t *testing.T) {
 	candidate := `package candidate
 
-import "github.com/doctrust/doctrust/internal/eval"
+import "github.com/PithomLabs/doctrust/internal/eval"
 
 type Check struct{}
 

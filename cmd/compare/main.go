@@ -7,10 +7,10 @@ import (
 	"os"
 	"sort"
 
-	"github.com/doctrust/doctrust/internal/eval"
-	"github.com/doctrust/doctrust/internal/evidence"
-	"github.com/doctrust/doctrust/internal/opa"
-	"github.com/doctrust/doctrust/internal/service"
+	"github.com/PithomLabs/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/evidence"
+	"github.com/PithomLabs/doctrust/internal/opa"
+	"github.com/PithomLabs/doctrust/internal/service"
 )
 
 type comparisonResult struct {

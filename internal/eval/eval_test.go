@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 func TestAggregator(t *testing.T) {

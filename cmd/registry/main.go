@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 func main() {

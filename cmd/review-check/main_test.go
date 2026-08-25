@@ -31,7 +31,7 @@ func findRepoRoot(t *testing.T) string {
 
 const probeSource = `package candidate
 
-import "github.com/doctrust/doctrust/internal/eval"
+import "github.com/PithomLabs/doctrust/internal/eval"
 
 type ReviewProbeCheck struct{}
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 // Re-export shared leaf types.

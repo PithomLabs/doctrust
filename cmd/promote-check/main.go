@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/doctrust/doctrust/internal/compiler"
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/compiler"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 func main() {

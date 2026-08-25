@@ -3,10 +3,10 @@ package ingest
 import (
 	"fmt"
 
-	"github.com/doctrust/doctrust/internal/extraction"
-	"github.com/doctrust/doctrust/internal/facts"
-	"github.com/doctrust/doctrust/internal/nutrient"
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/extraction"
+	"github.com/PithomLabs/doctrust/internal/facts"
+	"github.com/PithomLabs/doctrust/internal/nutrient"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 // Normalizer converts Nutrient extraction output into Facts.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 // goCheckSystemPrompt is the system prompt for Go Check generation.
@@ -24,7 +24,7 @@ You MUST return valid JSON with exactly these fields:
 
 Constraints:
 - Package must be "candidate"
-- Must import "github.com/doctrust/doctrust/internal/eval"
+- Must import "github.com/PithomLabs/doctrust/internal/eval"
 - Must implement eval.Check interface: ID(), Version(), Evaluate(facts eval.Facts, params map[string]any) eval.Result
 - Use eval.StatusPass, eval.StatusReview, eval.StatusFail
 - Use eval.SeverityInfo, eval.SeverityWarning, eval.SeverityBlocking

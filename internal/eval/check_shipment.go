@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 // GrossWeightReconciliationCheck verifies that the declared shipment gross

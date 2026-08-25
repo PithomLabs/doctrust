@@ -3,7 +3,7 @@ package nutrient
 import (
 	"time"
 
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 // ExtractFieldsRequest is the instructions JSON sent with extract_fields.
@@ -31,20 +31,20 @@ type ExtractFieldsResponse struct {
 }
 
 type ExtractFieldsOutput struct {
-	Data     map[string]any     `json:"data"`
+	Data     map[string]any           `json:"data"`
 	Metadata map[string]FieldCitation `json:"metadata,omitempty"`
-	Pages    []PageInfo         `json:"pages,omitempty"`
+	Pages    []PageInfo               `json:"pages,omitempty"`
 }
 
 // FieldCitation is the per-field citation from extract_fields metadata.
 type FieldCitation struct {
-	Bbox    *BBox   `json:"bbox,omitempty"`
-	Confidence float64 `json:"confidence,omitempty"`
+	Bbox                 *BBox                 `json:"bbox,omitempty"`
+	Confidence           float64               `json:"confidence,omitempty"`
 	ConfidenceComponents *ConfidenceComponents `json:"confidenceComponents,omitempty"`
-	Match   string  `json:"match,omitempty"` // "id_match", "not_found", etc.
-	PageIndex  int   `json:"pageIndex,omitempty"`
-	PageNumber int   `json:"pageNumber,omitempty"`
-	SourceBboxes []SourceBBox `json:"source_bboxes,omitempty"`
+	Match                string                `json:"match,omitempty"` // "id_match", "not_found", etc.
+	PageIndex            int                   `json:"pageIndex,omitempty"`
+	PageNumber           int                   `json:"pageNumber,omitempty"`
+	SourceBboxes         []SourceBBox          `json:"source_bboxes,omitempty"`
 }
 
 type ConfidenceComponents struct {
@@ -53,10 +53,10 @@ type ConfidenceComponents struct {
 }
 
 type SourceBBox struct {
-	Bbox      *BBox  `json:"bbox,omitempty"`
-	BlockID   string `json:"block_id,omitempty"`
-	PageIndex  int   `json:"pageIndex,omitempty"`
-	PageNumber int   `json:"pageNumber,omitempty"`
+	Bbox       *BBox  `json:"bbox,omitempty"`
+	BlockID    string `json:"block_id,omitempty"`
+	PageIndex  int    `json:"pageIndex,omitempty"`
+	PageNumber int    `json:"pageNumber,omitempty"`
 }
 
 type BBox struct {
@@ -136,10 +136,10 @@ const (
 
 // ExtractionResult holds the full extraction output for a single document.
 type ExtractionResult struct {
-	FileName     string                 `json:"file_name"`
-	DocumentType DocumentType           `json:"document_type"`
-	Fields       map[string]any         `json:"fields"`
+	FileName     string                   `json:"file_name"`
+	DocumentType DocumentType             `json:"document_type"`
+	Fields       map[string]any           `json:"fields"`
 	Metadata     map[string]FieldCitation `json:"metadata"`
-	Pages        []PageInfo             `json:"pages,omitempty"`
-	ExtractedAt  time.Time              `json:"extracted_at"`
+	Pages        []PageInfo               `json:"pages,omitempty"`
+	ExtractedAt  time.Time                `json:"extracted_at"`
 }

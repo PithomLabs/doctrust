@@ -14,8 +14,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/doctrust/doctrust/internal/review"
-	"github.com/doctrust/doctrust/internal/service"
+	"github.com/PithomLabs/doctrust/internal/review"
+	"github.com/PithomLabs/doctrust/internal/service"
 )
 
 type toolError struct {

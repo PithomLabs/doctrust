@@ -1,6 +1,6 @@
 package facts
 
-import "github.com/doctrust/doctrust/internal/types"
+import "github.com/PithomLabs/doctrust/internal/types"
 
 // Re-export shared leaf types.
 type DocumentType = types.DocumentType

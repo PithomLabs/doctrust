@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 // ExtractionConfig defines how to normalize a specific document type.
@@ -106,7 +106,7 @@ func ShipmentReleaseConfigs() map[types.DocumentType]ExtractionConfig {
 		types.DocTypeBillOfLading: {
 			DocumentType: "bill_of_lading",
 			FieldMapping: map[string]FieldNormalization{
-				"gross_weight":    gw(),
+				"gross_weight": gw(),
 				"bill_of_lading_number": {SemanticType: "shipment.bill_of_lading_reference",
 					ValueType: "string"},
 				"container_number": {SemanticType: "shipment.container", ValueType: "string"},

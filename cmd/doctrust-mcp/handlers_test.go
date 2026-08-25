@@ -10,7 +10,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/doctrust/doctrust/internal/service"
+	"github.com/PithomLabs/doctrust/internal/service"
 )
 
 func setupTestService(t *testing.T) *service.DocTrustService {

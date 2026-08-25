@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/doctrust/doctrust/internal/evidence"
-	"github.com/doctrust/doctrust/internal/ingest"
-	"github.com/doctrust/doctrust/internal/nutrient"
+	"github.com/PithomLabs/doctrust/internal/evidence"
+	"github.com/PithomLabs/doctrust/internal/ingest"
+	"github.com/PithomLabs/doctrust/internal/nutrient"
 )
 
 // Schema per document type for extract_fields.

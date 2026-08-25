@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/doctrust/doctrust/internal/review"
+	"github.com/PithomLabs/doctrust/internal/review"
 )
 
 func runProvision(args []string) {

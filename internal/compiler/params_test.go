@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 func TestResolveRulesetParams_ProductionSemantics(t *testing.T) {

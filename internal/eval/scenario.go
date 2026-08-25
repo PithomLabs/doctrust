@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/doctrust/doctrust/internal/facts"
+	"github.com/PithomLabs/doctrust/internal/facts"
 	"gopkg.in/yaml.v3"
 )
 

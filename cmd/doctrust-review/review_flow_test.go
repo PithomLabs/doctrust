@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doctrust/doctrust/internal/eval"
-	"github.com/doctrust/doctrust/internal/service"
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/service"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 func TestCompareFindings_Match(t *testing.T) {

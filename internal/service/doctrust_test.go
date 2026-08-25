@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doctrust/doctrust/internal/review"
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/review"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 const testSnapshotJSON = `{

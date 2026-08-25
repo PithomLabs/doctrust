@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doctrust/doctrust/internal/evidence"
-	"github.com/doctrust/doctrust/internal/eval"
-	"github.com/doctrust/doctrust/internal/facts"
-	"github.com/doctrust/doctrust/internal/ingest"
-	"github.com/doctrust/doctrust/internal/nutrient"
+	"github.com/PithomLabs/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/evidence"
+	"github.com/PithomLabs/doctrust/internal/facts"
+	"github.com/PithomLabs/doctrust/internal/ingest"
+	"github.com/PithomLabs/doctrust/internal/nutrient"
 )
 
 // TestFactsContract_NutrientToChecks verifies the Nutrient → Facts → Checks contract.

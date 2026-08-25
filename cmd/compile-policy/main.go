@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/doctrust/doctrust/internal/compiler"
+	"github.com/PithomLabs/doctrust/internal/compiler"
 )
 
 func main() {

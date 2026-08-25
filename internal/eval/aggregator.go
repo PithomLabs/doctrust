@@ -1,6 +1,6 @@
 package eval
 
-import "github.com/doctrust/doctrust/internal/types"
+import "github.com/PithomLabs/doctrust/internal/types"
 
 type DecisionAggregator struct{}
 

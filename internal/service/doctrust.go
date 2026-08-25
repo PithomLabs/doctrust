@@ -8,12 +8,12 @@ import (
 	"os"
 	"sync"
 
-	"github.com/doctrust/doctrust/internal/audit"
-	"github.com/doctrust/doctrust/internal/evidence"
-	"github.com/doctrust/doctrust/internal/eval"
-	"github.com/doctrust/doctrust/internal/facts"
-	"github.com/doctrust/doctrust/internal/review"
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/audit"
+	"github.com/PithomLabs/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/evidence"
+	"github.com/PithomLabs/doctrust/internal/facts"
+	"github.com/PithomLabs/doctrust/internal/review"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 type caseState struct {

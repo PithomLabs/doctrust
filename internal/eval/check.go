@@ -1,8 +1,8 @@
 package eval
 
 import (
-	"github.com/doctrust/doctrust/internal/types"
-	"github.com/doctrust/doctrust/internal/facts"
+	"github.com/PithomLabs/doctrust/internal/facts"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 // Facts is a type alias for the canonical facts.Facts.
@@ -35,12 +35,12 @@ type Check interface {
 }
 
 type Result struct {
-	CheckID  string                `json:"check_id" yaml:"check_id"`
-	Status   Status                `json:"status" yaml:"status"`
-	Severity Severity              `json:"severity" yaml:"severity"`
-	Reason   string                `json:"reason" yaml:"reason"`
+	CheckID  string              `json:"check_id" yaml:"check_id"`
+	Status   Status              `json:"status" yaml:"status"`
+	Severity Severity            `json:"severity" yaml:"severity"`
+	Reason   string              `json:"reason" yaml:"reason"`
 	Evidence []types.EvidenceRef `json:"evidence" yaml:"evidence"`
-	Metrics  map[string]any        `json:"metrics,omitempty" yaml:"metrics,omitempty"`
+	Metrics  map[string]any      `json:"metrics,omitempty" yaml:"metrics,omitempty"`
 }
 
 type CheckRef struct {
@@ -50,9 +50,9 @@ type CheckRef struct {
 }
 
 type Ruleset struct {
-	ID       string      `yaml:"id"`
-	Version  string      `yaml:"version"` // immutable once promoted
-	Checks   []CheckRef  `yaml:"checks"`
+	ID      string     `yaml:"id"`
+	Version string     `yaml:"version"` // immutable once promoted
+	Checks  []CheckRef `yaml:"checks"`
 }
 
 type Aggregator interface {

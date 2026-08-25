@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 func TestVerifyRuleset_ValidDomain(t *testing.T) {

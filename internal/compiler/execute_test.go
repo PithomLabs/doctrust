@@ -113,11 +113,11 @@ func TestExecuteCandidateScenarios_Mismatch(t *testing.T) {
 
 func TestExecuteCandidateScenarios_CompileError(t *testing.T) {
 	candidateDir := createTestCandidate(t, &testCandidateOpts{
-		checkID:  "test_bad_compile",
-		version:  "1.0",
+		checkID: "test_bad_compile",
+		version: "1.0",
 		goSource: `package candidate
 
-import "github.com/doctrust/doctrust/internal/eval"
+import "github.com/PithomLabs/doctrust/internal/eval"
 
 type BadCheck struct{}
 
@@ -358,7 +358,7 @@ func createTestCandidate(t *testing.T, opts *testCandidateOpts) string {
 
 const alwaysPassCheckGo = `package candidate
 
-import "github.com/doctrust/doctrust/internal/eval"
+import "github.com/PithomLabs/doctrust/internal/eval"
 
 type AlwaysPassCheck struct{}
 
@@ -387,7 +387,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 type ThresholdCheck struct{}

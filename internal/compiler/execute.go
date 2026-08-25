@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/doctrust/doctrust/internal/eval"
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/types"
 	"gopkg.in/yaml.v3"
 )
 
@@ -73,7 +73,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 func main() {
@@ -293,10 +293,10 @@ func parseCandidateScenarios(snapshot *CandidateSnapshot) ([]eval.Scenario, erro
 func parseScenarioYAML(data []byte) ([]eval.Scenario, error) {
 	var wrapper struct {
 		Scenarios []struct {
-			Name   string         `yaml:"name"`
-			Origin string         `yaml:"origin"`
-			Input  scenarioInput  `yaml:"input"`
-			Params map[string]any `yaml:"params"`
+			Name     string         `yaml:"name"`
+			Origin   string         `yaml:"origin"`
+			Input    scenarioInput  `yaml:"input"`
+			Params   map[string]any `yaml:"params"`
 			Expected struct {
 				CheckID  string              `yaml:"check_id"`
 				Status   string              `yaml:"status"`

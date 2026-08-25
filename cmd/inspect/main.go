@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/nutrient"
+	"github.com/PithomLabs/doctrust/internal/nutrient"
 )
 
 func main() {
@@ -21,7 +21,7 @@ func main() {
 	c := nutrient.NewClient(key, "")
 
 	docs := []struct {
-		file  string
+		file   string
 		schema map[string]any
 	}{
 		{"demo/income_verification/1_Paystub_2025.pdf", map[string]any{

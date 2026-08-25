@@ -28,7 +28,7 @@ func init() { fmt.Println(strings.Repeat("x", math.MaxInt)) }
 func TestValidateImports_AllowedInternalEval(t *testing.T) {
 	src := `package candidate
 
-import "github.com/doctrust/doctrust/internal/eval"
+import "github.com/PithomLabs/doctrust/internal/eval"
 
 type Check struct{}
 
@@ -51,8 +51,8 @@ func TestValidateImports_AllowedEvidence(t *testing.T) {
 	src := `package candidate
 
 import (
-	"github.com/doctrust/doctrust/internal/eval"
-	"github.com/doctrust/doctrust/internal/evidence"
+	"github.com/PithomLabs/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/evidence"
 )
 
 func init() { _ = evidence.EvidenceGraph{}; _ = eval.Result{} }
@@ -69,7 +69,7 @@ func init() { _ = evidence.EvidenceGraph{}; _ = eval.Result{} }
 func TestValidateImports_ForbiddenNutrient(t *testing.T) {
 	src := `package candidate
 
-import "github.com/doctrust/doctrust/internal/nutrient"
+import "github.com/PithomLabs/doctrust/internal/nutrient"
 
 func init() { nutrient.DoSomething() }
 `
@@ -80,7 +80,7 @@ func init() { nutrient.DoSomething() }
 	if len(violations) == 0 {
 		t.Fatal("expected violation for internal/nutrient, got none")
 	}
-	if violations[0].PackagePath != "github.com/doctrust/doctrust/internal/nutrient" {
+	if violations[0].PackagePath != "github.com/PithomLabs/doctrust/internal/nutrient" {
 		t.Errorf("wrong package path: %s", violations[0].PackagePath)
 	}
 	if violations[0].Line == 0 {
@@ -126,7 +126,7 @@ func init() { http.Get("http://evil.com") }
 func TestValidateImports_ForbiddenService(t *testing.T) {
 	src := `package candidate
 
-import "github.com/doctrust/doctrust/internal/service"
+import "github.com/PithomLabs/doctrust/internal/service"
 
 func init() { _ = service.DocTrustService{} }
 `
@@ -145,7 +145,7 @@ func TestValidateImports_MultipleViolations(t *testing.T) {
 import (
 	"os/exec"
 	"net/http"
-	"github.com/doctrust/doctrust/internal/nutrient"
+	"github.com/PithomLabs/doctrust/internal/nutrient"
 )
 
 func init() {}
@@ -161,7 +161,7 @@ func init() {}
 	for _, v := range violations {
 		paths[v.PackagePath] = true
 	}
-	for _, expected := range []string{"os/exec", "net/http", "github.com/doctrust/doctrust/internal/nutrient"} {
+	for _, expected := range []string{"os/exec", "net/http", "github.com/PithomLabs/doctrust/internal/nutrient"} {
 		if !paths[expected] {
 			t.Errorf("missing violation for %s", expected)
 		}
@@ -220,7 +220,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 type MyCheck struct{}
@@ -279,7 +279,7 @@ func TestValidateImports_ForbiddenExtraction(t *testing.T) {
 
 import (
 	"fmt"
-	"github.com/doctrust/doctrust/internal/extraction"
+	"github.com/PithomLabs/doctrust/internal/extraction"
 )
 
 func init() { fmt.Println(extraction.Extract(nil)) }

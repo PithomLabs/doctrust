@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 // fileHash returns the SHA-256 hex of a file's contents, or empty if not exists.
@@ -64,7 +64,7 @@ checks:
 	// Create candidate files
 	checkGo := `package candidate
 
-import "github.com/doctrust/doctrust/internal/eval"
+import "github.com/PithomLabs/doctrust/internal/eval"
 
 type MyNewCheck struct{}
 
@@ -560,7 +560,7 @@ checks:
 	// Setup candidate
 	checkGo := `package candidate
 
-import "github.com/doctrust/doctrust/internal/eval"
+import "github.com/PithomLabs/doctrust/internal/eval"
 
 type CustomCheck struct{}
 
@@ -1338,7 +1338,7 @@ scenarios:
 `), 0644)
 	os.WriteFile(filepath.Join(candidateDir, "check.go"), []byte(`package candidate
 
-import "github.com/doctrust/doctrust/internal/eval"
+import "github.com/PithomLabs/doctrust/internal/eval"
 
 type E2eGenuineCheckCheck struct{}
 
@@ -1632,7 +1632,7 @@ checks:
 
 const gateSeqPassingSource = `package candidate
 
-import "github.com/doctrust/doctrust/internal/eval"
+import "github.com/PithomLabs/doctrust/internal/eval"
 
 type GateSeqCheckCheck struct{}
 
@@ -1653,7 +1653,7 @@ func TestGateSequence_Failure_ForbiddenImport_NoMutation(t *testing.T) {
 import (
 	"os"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 type GateSeqCheckCheck struct{}
@@ -1694,7 +1694,7 @@ func TestGateSequence_Failure_SymbolCollision_NoMutation(t *testing.T) {
 	// declared AFTER the check struct so struct selection stays correct.
 	collisionSource := `package candidate
 
-import "github.com/doctrust/doctrust/internal/eval"
+import "github.com/PithomLabs/doctrust/internal/eval"
 
 type GateSeqCheckCheck struct{}
 
@@ -1815,7 +1815,7 @@ func TestGateSequence_Failure_StagedRegression_NoMutation(t *testing.T) {
 // "&GateSeqCheckCheck{}" from the id and died at Gate 7 on this exact input.
 const deviatingSource = `package candidate
 
-import "github.com/doctrust/doctrust/internal/eval"
+import "github.com/PithomLabs/doctrust/internal/eval"
 
 type WeirdlyNamedProbe struct{}
 

@@ -170,8 +170,8 @@ cat > "$FA/check.go" <<'GOEOF'
 package candidate
 
 import (
-	"github.com/doctrust/doctrust/internal/evidence"
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/evidence"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 type JudgeMismatchCheck struct{}
@@ -278,7 +278,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/doctrust/doctrust/internal/compiler"
+	"github.com/PithomLabs/doctrust/internal/compiler"
 )
 
 // scratch-only demo tooling: simulates an erroneous but content-valid approval so the

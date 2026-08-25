@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/review"
+	"github.com/PithomLabs/doctrust/internal/review"
 )
 
 type DecisionSidecar struct {
@@ -52,7 +52,7 @@ func main() {
 		os.Exit(2)
 	}
 
-snapshotPath := args[0]
+	snapshotPath := args[0]
 
 	// Verify snapshot exists
 	_, err := os.ReadFile(snapshotPath)

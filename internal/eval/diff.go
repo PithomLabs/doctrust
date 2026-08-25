@@ -3,18 +3,18 @@ package eval
 import (
 	"math"
 
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 type ScenarioDiff struct {
-	ScenarioName     string
-	Before           Result
-	After            Result
-	Changed          bool
-	StatusChanged    bool
-	SeverityChanged  bool
-	ReasonChanged    bool
-	EvidenceChanged  bool
+	ScenarioName    string
+	Before          Result
+	After           Result
+	Changed         bool
+	StatusChanged   bool
+	SeverityChanged bool
+	ReasonChanged   bool
+	EvidenceChanged bool
 }
 
 func DiffResults(after, before Result) *ScenarioDiff {
@@ -25,25 +25,25 @@ func DiffResults(after, before Result) *ScenarioDiff {
 		return nil
 	}
 	return &ScenarioDiff{
-		Before:           before,
-		After:            after,
-		Changed:          true,
-		StatusChanged:    after.Status != before.Status,
-		SeverityChanged:  after.Severity != before.Severity,
-		ReasonChanged:    after.Reason != before.Reason,
-		EvidenceChanged:  !evidenceEqual(after.Evidence, before.Evidence),
+		Before:          before,
+		After:           after,
+		Changed:         true,
+		StatusChanged:   after.Status != before.Status,
+		SeverityChanged: after.Severity != before.Severity,
+		ReasonChanged:   after.Reason != before.Reason,
+		EvidenceChanged: !evidenceEqual(after.Evidence, before.Evidence),
 	}
 }
 
 type ScenarioDiffSummary struct {
-	ScenarioName     string `json:"name"`
-	Changed          bool   `json:"changed"`
-	StatusChanged    bool   `json:"status_changed"`
-	SeverityChanged  bool   `json:"severity_changed"`
-	ReasonChanged    bool   `json:"reason_changed"`
-	EvidenceChanged  bool   `json:"evidence_changed"`
-	Before           Result `json:"before"`
-	After            Result `json:"after"`
+	ScenarioName    string `json:"name"`
+	Changed         bool   `json:"changed"`
+	StatusChanged   bool   `json:"status_changed"`
+	SeverityChanged bool   `json:"severity_changed"`
+	ReasonChanged   bool   `json:"reason_changed"`
+	EvidenceChanged bool   `json:"evidence_changed"`
+	Before          Result `json:"before"`
+	After           Result `json:"after"`
 }
 
 func (d *ScenarioDiff) ToSummary() ScenarioDiffSummary {
@@ -51,14 +51,14 @@ func (d *ScenarioDiff) ToSummary() ScenarioDiffSummary {
 		return ScenarioDiffSummary{}
 	}
 	return ScenarioDiffSummary{
-		ScenarioName:     d.ScenarioName,
-		Changed:          d.Changed,
-		StatusChanged:    d.StatusChanged,
-		SeverityChanged:  d.SeverityChanged,
-		ReasonChanged:    d.ReasonChanged,
-		EvidenceChanged:  d.EvidenceChanged,
-		Before:           d.Before,
-		After:            d.After,
+		ScenarioName:    d.ScenarioName,
+		Changed:         d.Changed,
+		StatusChanged:   d.StatusChanged,
+		SeverityChanged: d.SeverityChanged,
+		ReasonChanged:   d.ReasonChanged,
+		EvidenceChanged: d.EvidenceChanged,
+		Before:          d.Before,
+		After:           d.After,
 	}
 }
 

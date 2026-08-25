@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/doctrust/doctrust/internal/compiler"
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/compiler"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 func main() {
@@ -28,11 +28,11 @@ func main() {
 	// Build facts schema (hardcoded for income_verification domain)
 	// In a production system, this would be loaded from the domain's configuration.
 	factsSchema := map[string][]string{
-		"base_salary":              {"paystub.base_salary_ytd"},
-		"gross_income_projected":   {"paystub.annualized_gross_ytd"},
-		"gross_income_taxable":     {"w2.wages_tips_other_compensation"},
-		"bonus_compensation":       {"paystub.bonus_ytd"},
-		"net_cash_flow":            {"bank_statement.total_deposits"},
+		"base_salary":            {"paystub.base_salary_ytd"},
+		"gross_income_projected": {"paystub.annualized_gross_ytd"},
+		"gross_income_taxable":   {"w2.wages_tips_other_compensation"},
+		"bonus_compensation":     {"paystub.bonus_ytd"},
+		"net_cash_flow":          {"bank_statement.total_deposits"},
 	}
 	_ = domain // used for future domain-specific schema loading
 

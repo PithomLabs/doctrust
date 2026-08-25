@@ -19,34 +19,34 @@ type ImportViolation struct {
 // This is a positive allowlist with default-deny semantics.
 var allowedImports = map[string]bool{
 	// Safe stdlib packages for check logic
-	"fmt":      true,
-	"math":     true,
-	"sort":     true,
-	"strconv":  true,
-	"strings":  true,
-	"time":     true,
+	"fmt":     true,
+	"math":    true,
+	"sort":    true,
+	"strconv": true,
+	"strings": true,
+	"time":    true,
 
 	// Eval engine packages (required for Check interface)
-	"github.com/doctrust/doctrust/internal/eval":     true,
-	"github.com/doctrust/doctrust/internal/evidence": true,
-	"github.com/doctrust/doctrust/internal/types":    true,
-	"github.com/doctrust/doctrust/internal/facts":    true,
+	"github.com/PithomLabs/doctrust/internal/eval":     true,
+	"github.com/PithomLabs/doctrust/internal/evidence": true,
+	"github.com/PithomLabs/doctrust/internal/types":    true,
+	"github.com/PithomLabs/doctrust/internal/facts":    true,
 }
 
 // forbiddenImports is an explicit denylist for imports that would otherwise
 // pass the allowlist (e.g., subpackages of allowed paths). Checked first.
 var forbiddenImports = map[string]bool{
-	"github.com/doctrust/doctrust/internal/nutrient":  true,
-	"github.com/doctrust/doctrust/internal/extraction": true,
-	"github.com/doctrust/doctrust/internal/ingest":    true,
-	"github.com/doctrust/doctrust/internal/opa":       true,
-	"github.com/doctrust/doctrust/internal/service":   true,
-	"github.com/doctrust/doctrust/internal/compiler":  true,
-	"os/exec":     true,
-	"net/http":    true,
-	"os/signal":   true,
-	"os/user":     true,
-	"plugin":      true,
+	"github.com/PithomLabs/doctrust/internal/nutrient":   true,
+	"github.com/PithomLabs/doctrust/internal/extraction": true,
+	"github.com/PithomLabs/doctrust/internal/ingest":     true,
+	"github.com/PithomLabs/doctrust/internal/opa":        true,
+	"github.com/PithomLabs/doctrust/internal/service":    true,
+	"github.com/PithomLabs/doctrust/internal/compiler":   true,
+	"os/exec":   true,
+	"net/http":  true,
+	"os/signal": true,
+	"os/user":   true,
+	"plugin":    true,
 }
 
 // ValidateImports parses Go source and checks all import declarations against

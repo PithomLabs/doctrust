@@ -17,9 +17,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/doctrust/doctrust/internal/eval"
-	"github.com/doctrust/doctrust/internal/review"
-	"github.com/doctrust/doctrust/internal/service"
+	"github.com/PithomLabs/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/review"
+	"github.com/PithomLabs/doctrust/internal/service"
 )
 
 type reviewIO struct {

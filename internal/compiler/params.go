@@ -1,7 +1,7 @@
 package compiler
 
 import (
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 )
 
 // ResolveRulesetParams returns the Ruleset's params for the given check ID,

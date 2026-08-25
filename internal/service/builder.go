@@ -3,9 +3,9 @@ package service
 import (
 	"fmt"
 
-	"github.com/doctrust/doctrust/internal/evidence"
-	"github.com/doctrust/doctrust/internal/facts"
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/evidence"
+	"github.com/PithomLabs/doctrust/internal/facts"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 // BuildFactsFromSnapshot converts an EvidenceGraph into canonical Facts.

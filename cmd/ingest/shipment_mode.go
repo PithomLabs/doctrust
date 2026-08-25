@@ -13,9 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/ingest"
-	"github.com/doctrust/doctrust/internal/nutrient"
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/ingest"
+	"github.com/PithomLabs/doctrust/internal/nutrient"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 func isShipmentInvocation(args []string) bool {

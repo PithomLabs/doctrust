@@ -1,4 +1,4 @@
-module github.com/doctrust/doctrust
+module github.com/PithomLabs/doctrust
 
 go 1.25.7
 

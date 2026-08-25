@@ -3,7 +3,7 @@ package ingest
 import (
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 // ClassifyDocument determines the document type from the filename.

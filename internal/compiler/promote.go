@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/eval"
 	"gopkg.in/yaml.v3"
 )
 
@@ -146,7 +146,7 @@ func ValidateSnapshot(snapshot *CandidateSnapshot, registry *eval.CheckRegistry,
 	}
 
 	// Build a real validation worktree with the full module graph so candidates
-	// importing github.com/doctrust/doctrust/internal/eval compile correctly.
+	// importing github.com/PithomLabs/doctrust/internal/eval compile correctly.
 	repoRoot, modErr := FindModuleRoot()
 	if modErr != nil {
 		return nil, fmt.Errorf("resolve module root for validation environment: %w", modErr)
@@ -240,7 +240,7 @@ var goListDeps = func(dir string) ([]byte, error) {
 }
 
 // canonicalEvalImportPath is the import path every conforming candidate uses.
-const canonicalEvalImportPath = "github.com/doctrust/doctrust/internal/eval"
+const canonicalEvalImportPath = "github.com/PithomLabs/doctrust/internal/eval"
 
 // findNestedGoMod returns the path of any go.mod under root that is not root's own.
 func findNestedGoMod(root string) (string, error) {
@@ -271,7 +271,7 @@ func TransformCandidate(candidateCheckPath, outputPath string) error {
 	file.Name.Name = "eval"
 
 	// Track import aliases: path → local identifier name
-	evalPath := "github.com/doctrust/doctrust/internal/eval"
+	evalPath := "github.com/PithomLabs/doctrust/internal/eval"
 	var evalAlias string
 	var evalImportIdx int = -1
 
@@ -1299,20 +1299,20 @@ func copyDir(src, dst string) error {
 	if resolved, err := filepath.EvalSymlinks(srcAbs); err == nil {
 		srcAbs = resolved
 	}
-		// dst may not exist yet; resolve its nearest existing ancestor instead.
-		dstProbe := dstAbs
-		for {
-			if resolved, err := filepath.EvalSymlinks(dstProbe); err == nil {
-				rel := strings.TrimPrefix(strings.TrimPrefix(dstAbs, dstProbe), string(filepath.Separator))
-				dstAbs = filepath.Join(resolved, rel)
-				break
-			}
-			parent := filepath.Dir(dstProbe)
-			if parent == dstProbe {
-				break
-			}
-			dstProbe = parent
+	// dst may not exist yet; resolve its nearest existing ancestor instead.
+	dstProbe := dstAbs
+	for {
+		if resolved, err := filepath.EvalSymlinks(dstProbe); err == nil {
+			rel := strings.TrimPrefix(strings.TrimPrefix(dstAbs, dstProbe), string(filepath.Separator))
+			dstAbs = filepath.Join(resolved, rel)
+			break
 		}
+		parent := filepath.Dir(dstProbe)
+		if parent == dstProbe {
+			break
+		}
+		dstProbe = parent
+	}
 	if isUnder(srcAbs, dstAbs) || isUnder(dstAbs, srcAbs) {
 		return fmt.Errorf("refusing copy: source %q and destination %q overlap", src, dst)
 	}

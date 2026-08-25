@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doctrust/doctrust/internal/evidence"
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/evidence"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 func TestBuildFactsFromSnapshot_SourceDocCanonical(t *testing.T) {

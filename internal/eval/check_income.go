@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 // getFloat64 safely extracts float64 from Facts (first value in slice)
@@ -199,7 +199,7 @@ func (c *GrossIncomeConsistencyCheck) Evaluate(facts Facts, params map[string]an
 				Reason:   "Variance exceeds tolerance; documented bonus may explain",
 				Evidence: evidenceList,
 				Metrics: map[string]any{
-					"paystub_gross":       paystubGross,
+					"paystub_gross":      paystubGross,
 					"w2_gross":           w2Gross,
 					"variance_pct":       variance * 100,
 					"tolerance_pct":      tolerance * 100,
@@ -218,10 +218,10 @@ func (c *GrossIncomeConsistencyCheck) Evaluate(facts Facts, params map[string]an
 			Reason:   "Paystub projected gross exceeds corroborated taxable income by " + formatPct(variance) + " (tolerance: " + formatPct(tolerance) + ")",
 			Evidence: evidenceList,
 			Metrics: map[string]any{
-				"paystub_gross":  paystubGross,
-				"w2_gross":       w2Gross,
-				"variance_pct":   variance * 100,
-				"tolerance_pct":  tolerance * 100,
+				"paystub_gross": paystubGross,
+				"w2_gross":      w2Gross,
+				"variance_pct":  variance * 100,
+				"tolerance_pct": tolerance * 100,
 			},
 		}
 	}

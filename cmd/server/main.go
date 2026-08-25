@@ -11,12 +11,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/doctrust/doctrust/internal/audit"
-	"github.com/doctrust/doctrust/internal/eval"
-	"github.com/doctrust/doctrust/internal/evidence"
-	"github.com/doctrust/doctrust/internal/nutrient"
-	"github.com/doctrust/doctrust/internal/review"
-	"github.com/doctrust/doctrust/internal/service"
+	"github.com/PithomLabs/doctrust/internal/audit"
+	"github.com/PithomLabs/doctrust/internal/eval"
+	"github.com/PithomLabs/doctrust/internal/evidence"
+	"github.com/PithomLabs/doctrust/internal/nutrient"
+	"github.com/PithomLabs/doctrust/internal/review"
+	"github.com/PithomLabs/doctrust/internal/service"
 )
 
 var (
@@ -114,12 +114,12 @@ func handleSnapshot(w http.ResponseWriter, r *http.Request) {
 // All explanation/presentation enrichment lives here, not in internal/eval.
 
 type enrichedSourceRef struct {
-	Filename   string  `json:"filename"`
-	FieldName  string  `json:"field_name"`
-	SourceSpan string  `json:"source_span,omitempty"`
-	Page       int     `json:"page,omitempty"`
+	Filename   string    `json:"filename"`
+	FieldName  string    `json:"field_name"`
+	SourceSpan string    `json:"source_span,omitempty"`
+	Page       int       `json:"page,omitempty"`
 	BBox       []float64 `json:"bbox,omitempty"`
-	Confidence float64 `json:"confidence,omitempty"`
+	Confidence float64   `json:"confidence,omitempty"`
 }
 
 type enrichedFinding struct {
@@ -269,9 +269,9 @@ func handleReview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		FindingIndex int               `json:"finding_index"`
+		FindingIndex int                  `json:"finding_index"`
 		Action       review.FindingAction `json:"action"`
-		Note         string            `json:"note"`
+		Note         string               `json:"note"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, fmt.Sprintf("invalid request: %v", err), 400)
@@ -341,11 +341,11 @@ func handleRuleset(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]any{
-		"id":             info.ID,
-		"version":        info.Version,
-		"hash":           hash,
-		"checks":         checks,
-		"checks_count":   len(info.Checks),
+		"id":           info.ID,
+		"version":      info.Version,
+		"hash":         hash,
+		"checks":       checks,
+		"checks_count": len(info.Checks),
 	}); err != nil {
 		log.Printf("json encode error: %v", err)
 		http.Error(w, "internal error", 500)

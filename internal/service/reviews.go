@@ -8,8 +8,8 @@ import (
 	"crypto/ed25519"
 	"fmt"
 
-	"github.com/doctrust/doctrust/internal/review"
-	"github.com/doctrust/doctrust/internal/types"
+	"github.com/PithomLabs/doctrust/internal/review"
+	"github.com/PithomLabs/doctrust/internal/types"
 )
 
 // DecisionSidecar is the machine-readable decision context the human review
