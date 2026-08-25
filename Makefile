@@ -1,4 +1,4 @@
-.PHONY: build run test ingest clean setup demo-pdfs check-policy test-policy validate-fixtures eval compile-policy test-compiler server regression promote registry mcp author-check review-check promote-check verify-ruleset
+.PHONY: build run test ingest clean setup demo-pdfs check-policy test-policy validate-fixtures eval compile-policy test-compiler server regression promote registry mcp author-check review-check promote-check verify-ruleset verify-audit
 
 # Build all binaries
 build:
@@ -17,6 +17,7 @@ build:
 	go build -o bin/evidence-mcp ./cmd/evidence-mcp/
 	go build -o bin/doctrust-mcp ./cmd/doctrust-mcp/
 	go build -o bin/doctrust-review ./cmd/doctrust-review/
+	go build -o bin/verify-audit ./cmd/verify-audit/
 
 # Run the ingest pipeline on demo documents
 run: build
@@ -133,9 +134,8 @@ demo-review:
 	./scripts/demo-review.sh
 
 verify-audit:
-	@echo "== verify-audit: machine-readable audit trace =="
-	@ls -lh *.audit.json 2>/dev/null || ls -lh demo/*/*.audit.json 2>/dev/null || echo "run make demo-pass or demo-review first"
-	@cat *.audit.json 2>/dev/null | jq '.ruleset, .findings, .human_action' || cat demo/*/*.audit.json 2>/dev/null | jq '.ruleset, .findings, .human_action' || echo "audit artifact not yet generated — run demo-* first"
+	@if [ -z "$(SNAPSHOT_PATH)" ]; then echo "FAIL: SNAPSHOT_PATH required — usage: make verify-audit SNAPSHOT_PATH=/path/to/evidence_snapshot.json"; exit 1; fi; \
+	bin/verify-audit "$(SNAPSHOT_PATH)"
 
 # Authoritative provider-boundary check
 # internal/service and cmd/doctrust-mcp must NOT depend on

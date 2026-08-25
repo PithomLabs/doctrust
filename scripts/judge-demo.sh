@@ -33,16 +33,18 @@ cd "$SB" || exit 1
 make build >/dev/null 2>&1 && make mcp >/dev/null 2>&1 || { fail "build"; exit 1; }
 pass "build (12 binaries incl. doctrust-mcp)"
 
-# ============================================================== ACTS 1–4 ====
-log "ACT 1–4 — fresh MCP runtime: evaluate → findings → evidence → human review → artifact"
+# ============================================================== ACTS 1–6 ====
+log "ACTS 1–6 — agent MCP journey: request → evidence → REVIEW → agent stops at authority boundary"
+
 run_mcp() { # requests arrive on stdin from the feeder subshell
   timeout 150 bin/doctrust-mcp --rulesets-dir rulesets --snapshot-root "$SB/demo" 2>/dev/null
 }
 
-# --- Single-session MCP driver: writer reacts to live responses (no races) ---
+# --- Single-session MCP driver: writer reacts to live responses ---
 LATEST_PROMOTED=$(ls rulesets/income_verification/v*.yaml | grep -E 'v[0-9]+\.yaml$' | sed -E 's/.*v([0-9]+)\.yaml/\1/' | sort -n | tail -1)
 echo "ACT1 pre-assert: sandbox promoted latest = v$LATEST_PROMOTED" | tee -a "$LOG"
 REQ="$LOGROOT/mcp_$$.json"
+
 (
   send() { printf '%s\n' "$1"; }
 
@@ -50,8 +52,11 @@ REQ="$LOGROOT/mcp_$$.json"
   sleep 1
   send '{"jsonrpc":"2.0","method":"notifications/initialized"}'
   sleep 0.3
+
+  # ACT 1: User request — evaluate the case
   send '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"evaluate_case","arguments":{"snapshot_path":"income_verification/evidence_snapshot.json"}}}'
   for i in $(seq 1 240); do grep -q '"case_id"' "$REQ" 2>/dev/null && break; sleep 0.25; done
+
   CID=$(python3 - "$REQ" <<'PY'
 import json,sys
 for line in open(sys.argv[1]):
@@ -64,8 +69,11 @@ PY
 )
   [ -n "$CID" ] || exit 3
   sleep 0.5
+
+  # ACT 2: Get findings — shows REVIEW
   send "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"get_findings\",\"arguments\":{\"case_id\":\"$CID\"}}}"
   for i in $(seq 1 120); do grep -q '"findings"' "$REQ" 2>/dev/null && break; sleep 0.25; done
+
   RIDX=$(python3 - "$REQ" <<'PY'
 import json,sys
 best=None
@@ -80,11 +88,13 @@ PY
 )
   [ "$RIDX" != "-1" ] || exit 4
   sleep 0.5
+
+  # ACT 3: Get evidence for the REVIEW finding
   send "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"get_evidence\",\"arguments\":{\"case_id\":\"$CID\",\"finding_index\":$RIDX}}}"
   sleep 1
-  send "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"request_human_review\",\"arguments\":{\"case_id\":\"$CID\",\"finding_index\":$RIDX,\"action\":\"confirm\",\"note\":\"Presenter confirms disposition after reviewing document evidence\"}}}"
-  sleep 1
-  send "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"get_audit_artifact\",\"arguments\":{\"case_id\":\"$CID\"}}}"
+
+  # ACT 4: Get audit artifact — proves REVIEW remains unresolved without human
+  send "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"get_audit_artifact\",\"arguments\":{\"case_id\":\"$CID\"}}}"
   sleep 2
 ) | run_mcp > "$REQ" &
 MCP_PID=$!
@@ -98,14 +108,20 @@ for line in open(sys.argv[1]):
     try: o=json.loads(line)
     except Exception: continue
     if isinstance(o.get('id'),int) and o['id']>=2: resp[o['id']]=o
-missing=[i for i in (2,3,4,5,6) if i not in resp]
+
+missing=[i for i in (2,3,4,5) if i not in resp]
 assert not missing, f"MCP-INCOMPLETE missing={missing}"
+
 def payload(i): return json.loads(resp[i]['result']['content'][0]['text'])
+
+# ACT 1: evaluate_case
 ev=payload(2)
 if str(ev.get('ruleset_version')) != LATEST:
     print(f"VERSION-ASSERT-FAIL: evaluate_case.ruleset_version={ev.get('ruleset_version')} != promoted latest {LATEST}")
     raise SystemExit(5)
 print(f"ACT1 evaluate_case: case_id={ev.get('case_id')} ruleset={ev.get('ruleset_id')} v{ev.get('ruleset_version')} status={ev.get('status')} severity={ev.get('severity')} findings={ev.get('finding_count')}")
+
+# ACT 2: findings
 fnd=payload(3).get('findings',[])
 ridx=None
 print("ACT2 findings:")
@@ -113,30 +129,41 @@ for f in fnd:
     sel=" <-- selected (REVIEW)" if f.get('status')=='REVIEW' and ridx is None else ""
     if f.get('status')=='REVIEW' and ridx is None: ridx=f['index']
     print(f"   [{f['index']}] {f['check_id']}: {f['status']}/{f['severity']} - {str(f.get('reason'))[:70]}{sel}")
+
+# ACT 3: evidence
 evl=payload(4)
 elist=(evl.get('evidence') or evl.get('evidence_refs') or [])
-print("ACT2b evidence refs:")
+print("ACT3 evidence refs:")
 for e in elist[:3]:
     print(f"   field={e.get('field')} doc={e.get('source_doc')} span={e.get('source_span')} conf={e.get('confidence')}")
-rv=payload(5)
-print(f"ACT3 human review recorded (action/note accepted): keys={sorted(rv.keys())[:6]}")
-art=payload(6); a=art.get('artifact',{})
-hr = a.get('human_reviews') or []
-print(f"ACT4 artifact: ruleset={a.get('ruleset_id')} v{a.get('ruleset_version')} hash={str(art.get('artifact_hash'))[:16]} disposition={a.get('final_disposition')!r}")
-print(f"ACT4 human_reviews entries={len(hr)}")
-for e in hr[:2]:
-    print(f"   finding_index={e.get('finding_index')} action={e.get('action')} note={str(e.get('note'))[:60]!r} resolved_at={e.get('resolved_at')}")
-print("ACT4 narration: confirm upholds the engine's REVIEW disposition")
-assert elist, "no evidence returned"
-print("ACTS-PASS: act1 act2_findings act2b_evidence act3_human_review act4_artifact")
-PY
-[ ${PIPESTATUS[0]} -eq 0 ] || { fail "Acts 1–4 flow failed"; exit 1; }
-pass "Acts 1–4 witnessed live (values parsed from real responses)"
 
-# ============================================================== ACT 5 ========
-FIXTURE_LABEL='DEMO FIXTURE — intentionally invalid policy expectation; not production data'
-log "ACT 5 — deliberately bad rule: Expected PASS vs Actual REVIEW (approval must block)"
-echo "$FIXTURE_LABEL" | tee -a "$LOG"
+# ACT 4: audit artifact — must carry ZERO HumanReviewRecords, disposition=REVIEW
+art=payload(5); a=art.get('artifact',{})
+hr = a.get('human_reviews') or []
+fd = a.get('final_disposition')
+print(f"ACT4 artifact: ruleset={a.get('ruleset_id')} v{a.get('ruleset_version')} hash={str(art.get('artifact_hash'))[:16]} disposition={fd!r}")
+print(f"ACT4 human_reviews entries={len(hr)} (expected 0 — agent cannot author reviews)")
+if hr:
+    for e in hr[:2]:
+        print(f"   UNEXPECTED: finding_index={e.get('finding_index')} action={e.get('action')} note={str(e.get('note'))[:60]!r} resolved_at={e.get('resolved_at')}")
+    print("ACT4 FAIL: HumanReviewRecords present after agent-only session — authority boundary broken")
+    raise SystemExit(7)
+if fd and fd == "PASS":
+    print("ACT4 FAIL: final disposition must not be PASS after an agent-only session with unresolved REVIEW findings")
+    raise SystemExit(8)
+if fd != "REVIEW":
+    print(f"ACT4 FAIL: final disposition must be REVIEW (unresolved), got {fd!r}")
+    raise SystemExit(9)
+
+print("ACT4 narration: REVIEW remains unresolved — agent stops here; only an authorized human via bin/doctrust-review can resolve it")
+assert elist, "no evidence returned"
+print("ACTS-PASS: act1_evaluate act2_findings act3_evidence act4_audit_unresolved")
+PY
+[ ${PIPESTATUS[0]} -eq 0 ] || { fail "Acts 1–6 flow failed"; exit 1; }
+pass "Acts 1–6 witnessed live (agent stops at REVIEW / human-authority boundary)"
+
+# ============================================================== ACT 7 ========
+log "ACT 7 — defense-in-depth: bad policy rejection at approval gate"
 FA="candidates/active/judge_mismatch_check"
 mkdir -p "$FA"
 cat > "$FA/check.go" <<'GOEOF'
@@ -208,17 +235,17 @@ scenarios:
 YMLEOF
 echo -n DRAFT > "$FA/state"
 printf '%s\n' 'DEMO FIXTURE — intentionally invalid policy expectation; not production data' | tee -a "$LOG"
-printf 'a\ny\n' | bin/review-check "$FA" > "$LOG.act5" 2>&1 || true
-SEMROW=$(grep -F 'expects_pass_but_engine_reviews: expected=PASS/INFO actual=REVIEW/WARNING' "$LOG.act5" | head -1)
+printf 'a\ny\n' | bin/review-check "$FA" > "$LOG.act7" 2>&1 || true
+SEMROW=$(grep -F 'expects_pass_but_engine_reviews: expected=PASS/INFO actual=REVIEW/WARNING' "$LOG.act7" | head -1)
 STATE=$(cat "$FA/state" 2>/dev/null || echo DRAFT)
 if [ -n "$SEMROW" ] && [ "$STATE" != "APPROVED" ]; then
-  pass "Act 5: semantic rejection witnessed — $SEMROW ; approval BLOCKED"
+  pass "Act 7: semantic rejection witnessed — $SEMROW ; approval BLOCKED"
 else
-  fail "Act 5: approval unexpectedly allowed"; exit 1
+  fail "Act 7: approval unexpectedly allowed"; exit 1
 fi
 
-# ============================================================== ACT 6 ========
-log "ACT 6 — defense-in-depth promotion gate (scratch-approved same-mismatch candidate)"
+# ============================================================== ACT 8 ========
+log "ACT 8 — defense-in-depth promotion gate (scratch-approved same-mismatch candidate)"
 FB="candidates/active/judge_gate5_probe"
 mkdir -p "$FB"
 cp "$FA/check.go" "$FB/check.go"
@@ -268,16 +295,16 @@ func main() {
 	fmt.Println("approved-simulated")
 }
 GOEOF
-go run ./scrathtool "$FB" judge_gate5_probe >>"$LOG" 2>&1 || { fail "Act 6 setup"; exit 1; }
+go run ./scrathtool "$FB" judge_gate5_probe >>"$LOG" 2>&1 || { fail "Act 8 setup"; exit 1; }
 TREE_BEFORE=$(for d in internal/eval rulesets scenarios; do find "$d" -type f -print0; done | sort -z | xargs -0 sha256sum 2>/dev/null | sha256sum | cut -d' ' -f1)
 PC=$(timeout 300 bin/promote-check --candidate "$FB" --domain income_verification 2>&1)
 RC=$?
 TREE_AFTER=$(for d in internal/eval rulesets scenarios; do find "$d" -type f -print0; done | sort -z | xargs -0 sha256sum 2>/dev/null | sha256sum | cut -d' ' -f1)
 echo "$PC" | tail -6 | tee -a "$LOG"
 if [ $RC -ne 0 ] && echo "$PC" | grep -qE "scenario.*failed|Scenarios: .*failed" && [ "$TREE_BEFORE" = "$TREE_AFTER" ]; then
-  pass "Act 6: Gate 5 rejected bad policy; SHA256(trusted tree) unchanged"
+  pass "Act 8: Gate 5 rejected bad policy; SHA256(trusted tree) unchanged"
 else
-  fail "Act 6 unexpected state rc=$RC trees_equal=$([ "$TREE_BEFORE" = "$TREE_AFTER" ] && echo yes || echo NO)"; exit 1
+  fail "Act 8 unexpected state rc=$RC trees_equal=$([ "$TREE_BEFORE" = "$TREE_AFTER" ] && echo yes || echo NO)"; exit 1
 fi
 
 # ============================================================== CLOSE =======
@@ -289,4 +316,4 @@ echo | tee -a "$LOG"
 echo 'FINAL LINE: "DocTrust does not trust the agent to write the law. It makes sure the policy the agent consumes is trusted."' | tee -a "$LOG"
 cleanup
 pass "cleanup (sandbox removed, processes stopped)"
-echo "JUDGE-DEMO-STATUS: evaluate_case=PASS findings=PASS evidence=PASS human_review=PASS audit_artifact=PASS bad_policy_rejection=PASS gate5_rejection=PASS trusted_tree_immutability=PASS cleanup=PASS" | tee -a "$LOG"
+echo "JUDGE-DEMO-STATUS: evaluate_case=PASS findings=PASS evidence=PASS audit_unresolved=PASS agent_stops=PASS bad_policy_rejection=PASS gate5_rejection=PASS trusted_tree_immutability=PASS cleanup=PASS" | tee -a "$LOG"

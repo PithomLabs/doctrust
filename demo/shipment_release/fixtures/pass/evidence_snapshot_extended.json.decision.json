@@ -1,0 +1,62 @@
+{
+  "loadcase_id": "b8da4b902eede259",
+  "graph_case_id": "shipment_1282a5e32a34d052",
+  "snapshot_sha256": "b8da4b902eede25987c14fbdb8e01d880f6fc546870cd0a096579d6cf2bc2458",
+  "status": "PASS",
+  "findings": [
+    {
+      "index": 0,
+      "check_id": "required_shipment_documents",
+      "status": "PASS",
+      "severity": "INFO",
+      "reason": "all 4 required shipment documents present",
+      "metrics": {
+        "required_count": 4
+      }
+    },
+    {
+      "index": 1,
+      "check_id": "gross_weight_reconciliation",
+      "status": "PASS",
+      "severity": "INFO",
+      "reason": "gross weight reconciles across 4 documents (4650.00 KG)",
+      "metrics": {
+        "condition": "all_equal",
+        "source_count": 4,
+        "unit": "KG",
+        "value": 4650
+      },
+      "evidence": [
+        {
+          "field": "shipment.gross_weight",
+          "source_doc": "bill_of_lading",
+          "source_span": "page=1;bbox=[459.0,288.0,50.4,7.9]",
+          "confidence": 0.95
+        },
+        {
+          "field": "shipment.gross_weight",
+          "source_doc": "certificate_of_origin",
+          "source_span": "page=1;bbox=[493.9,380.9,53.6,7.9]",
+          "confidence": 0.95
+        },
+        {
+          "field": "shipment.gross_weight",
+          "source_doc": "commercial_invoice",
+          "source_span": "page=1;bbox=[511.9,349.9,50.8,6.8]",
+          "confidence": 0.95
+        },
+        {
+          "field": "shipment.gross_weight",
+          "source_doc": "packing_list",
+          "source_span": "page=2;bbox=[423.0,466.9,33.8,6.8]",
+          "confidence": 0.95
+        }
+      ]
+    }
+  ],
+  "ruleset": {
+    "id": "shipment_release",
+    "version": "1",
+    "hash": "d3f1a945867942c369295ce4105e070d16e7e2defce00d4d80aa4f72d934f834"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "loadcase_id": "efbededa3927205b",
+  "graph_case_id": "shipment_b6ed4668a55a11b7",
+  "snapshot_sha256": "efbededa3927205be4e5a1cc66617d6cd21d7b3edd9d13056b7420e46713817f",
+  "status": "REVIEW",
+  "findings": [
+    {
+      "index": 0,
+      "check_id": "required_shipment_documents",
+      "status": "REVIEW",
+      "severity": "BLOCKING",
+      "reason": "insufficient evidence: 2 of 4 required shipment documents present; missing: certificate_of_origin, packing_list",
+      "metrics": {
+        "missing": [
+          "certificate_of_origin",
+          "packing_list"
+        ],
+        "present_count": 2,
+        "required_count": 4
+      }
+    },
+    {
+      "index": 1,
+      "check_id": "gross_weight_reconciliation",
+      "status": "REVIEW",
+      "severity": "BLOCKING",
+      "reason": "insufficient evidence for shipment.gross_weight: missing sources certificate_of_origin, packing_list",
+      "metrics": {
+        "condition": "all_equal",
+        "missing_sources": [
+          "certificate_of_origin",
+          "packing_list"
+        ],
+        "present_sources": 2,
+        "required_sources": 4,
+        "unit": "KG"
+      },
+      "evidence": [
+        {
+          "field": "shipment.gross_weight",
+          "source_doc": "bill_of_lading",
+          "source_span": "page=1;bbox=[459.0,288.0,50.4,7.9]",
+          "confidence": 0.95
+        },
+        {
+          "field": "shipment.gross_weight",
+          "source_doc": "commercial_invoice",
+          "source_span": "page=1;bbox=[511.9,349.9,50.8,6.8]",
+          "confidence": 0.95
+        }
+      ]
+    }
+  ],
+  "ruleset": {
+    "id": "shipment_release",
+    "version": "1",
+    "hash": "d3f1a945867942c369295ce4105e070d16e7e2defce00d4d80aa4f72d934f834"
+  }
+}
