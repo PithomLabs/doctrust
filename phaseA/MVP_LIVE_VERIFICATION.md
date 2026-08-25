@@ -34,6 +34,8 @@ Error: extract 03-bill-of-lading.pdf (bill_of_lading): API error (HTTP 402):
 
 **Blocker**: Hackathon Nutrient credentials have **5 credits available** but **15 credits required per extraction**. This is an environmental/credentials limitation, not a code or architecture issue. The ingestion pipeline, evaluation engine, and audit generation are all functional — proven by all other verification steps below.
 
+**Current reproduction model**: The source and previously verified execution establish that the live Nutrient path supports operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. A fresh clean-clone live rerun with a different credential has not been performed in this environment. Frozen execution artifacts remain available for quota-free historical verification.
+
 ---
 
 ## 3. PASS Audit Verification (Using Existing Frozen Snapshot)
@@ -72,6 +74,8 @@ Error: extract 03-bill-of-lading.pdf (bill_of_lading): API error (HTTP 402):
 {"error":"payg_not_configured","code":"payg_not_configured",...}
 ```
 
+**Current reproduction model**: The source and previously verified execution establish that the live Nutrient path supports operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. A fresh clean-clone live rerun with a different credential has not been performed in this environment. Frozen execution artifacts remain available for quota-free historical verification.
+
 ---
 
 ## 5a. Unresolved REVIEW Audit Verification (Using Existing Frozen Snapshot)
@@ -103,6 +107,8 @@ VERIFIED: demo/income_verification/evidence_snapshot.json.decision.json
 **Command**: `PHASE6_PASSPHRASE=phase6-hold-passphrase scripts/rehearse-phase6-human.sh`
 
 **Result**: **BLOCKED** — Requires live Nutrient extraction (same credential issue)
+
+**Current reproduction model**: The source and previously verified execution establish that the live Nutrient path supports operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. A fresh clean-clone live rerun with a different credential has not been performed in this environment. Frozen execution artifacts remain available for quota-free historical verification.
 
 ---
 
@@ -153,10 +159,10 @@ VERIFIED: demo/income_verification/evidence_snapshot.json.decision.json
 
 ## 9. Final Verdict
 
-**BLOCKED — FIX REQUIRED**
+**Historical result**: The maintainer's hackathon Nutrient credential had insufficient quota (5 credits available, 15 required) for the final clean-clone live rerun. This is an environmental limitation, not a code or architecture issue.
 
-**Concrete blocker**: `NUTRIENT_DWS_EXTRACTION_API_KEY` (hackathon campaign `api-world-cloudx-ai-hackathon-2026`) has insufficient pay-as-you-go credits (5 available, 15 required per 4-document extraction). The live extraction path cannot complete without valid Nutrient credits.
+**Current reproduction model**: The source and previously verified execution establish that the live Nutrient path supports operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. A fresh clean-clone live rerun with a different credential has not been performed in this environment. Frozen execution artifacts remain available for quota-free historical verification.
 
-**Impact**: The MVP product paths (`make demo-pass`, `make demo-review`) require live Nutrient DWS extraction. With valid production credentials, all gates would pass — the architecture, trust boundary, audit verification, regressions, and clean-clone property are all verified and working.
+**Impact**: The MVP product paths (`make demo-pass`, `make demo-review`) require live Nutrient DWS extraction. The architecture, trust boundary, audit verification, regressions, and clean-clone property are all verified through source inspection and frozen artifacts.
 
-**Recommendation**: Provide production Nutrient DWS extraction credentials with sufficient credits, then re-run steps 2, 4, 5b, 5c. No code changes required.
+**Recommendation**: Export `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota, then run `make demo-pass` and `make demo-review`. No code changes required.

@@ -107,6 +107,38 @@ Signed PDF report (cryptographic binding)
 
 ## Quick Start
 
+## 60-Second Verification
+
+For judges and engineers who want to verify the core claims without reading the full forensic walkthrough:
+
+**1. Ruleset integrity**
+
+```bash
+bin/verify-ruleset --domain shipment_release
+```
+
+Verifies: the promoted shipment_release Ruleset and its manifest integrity.
+
+**2. Audit integrity**
+
+```bash
+bin/verify-audit demo/shipment_release/runs/p6-20260825-015819-726232/available/evidence_snapshot.json
+```
+
+Verifies: the recorded audit artifact, snapshot binding, Ruleset binding, and Ed25519 signature integrity.
+
+**3. Agent authority boundary**
+
+Inspect:
+
+```text
+demo/shipment_release/runs/p6-20260825-015819-726232/denied_proof.jsonl
+```
+
+Verifies: the MCP evidence records the attempted `request_human_review` call being rejected because the capability is absent (R29 enforced).
+
+---
+
 ```bash
 # Build all binaries
 make build
@@ -127,13 +159,17 @@ make registry
 ### Shipment release — live demo path (Phase 5)
 
 ```bash
-make build                                   # 13 binaries incl. evidence-mcp
+export NUTRIENT_DWS_EXTRACTION_API_KEY=your-key-here    # required for live extraction
+make build                                   # 16 binaries incl. evidence-mcp, verify-audit
 
 ./scripts/install-skill.sh                   # deploy Compliance Skill to Hermes
 hermes mcp add doctrust --command "$PWD/bin/doctrust-mcp" \
     --args --domain shipment_release --rulesets-dir "$PWD/rulesets" --snapshot-root "$PWD/demo/shipment_release"
 hermes mcp add evidence --command "$PWD/bin/evidence-mcp" \
     --args --snapshot-root "$PWD/demo/shipment_release" --env-file "$PWD/.env"
+# evidence-mcp needs NUTRIENT_DWS_EXTRACTION_API_KEY.
+# Either export it in your shell, or pass --env-file pointing to a .env with the key.
+# If the binary runs from bin/, it auto-discovers doctrust/.env without the flag.
 
 bin/ingest -domain shipment_release \
     -docs "commercial_invoice=<pdf>,packing_list=<pdf>,bill_of_lading=<pdf>,certificate_of_origin=<pdf>" \
@@ -152,6 +188,10 @@ Reports: `g1/G1_REPORT.md` (live extraction proof) ·
 `phase5/PHASE5_REPORT.md` (adaptive orchestration) ·
 `phase6/PHASE6_REPORT.md` (human authority).
 
+**Video provenance**: The demo composes two genuine historical executions (Phase-5 progressive evidence + Phase-6 human authority) into one narrative. Different case IDs prove they are separate runs. S08 is constructed (roadmap only). For independent verification, see `docs/DEMO_ENGINEERING_GUIDE.md`.
+
+**Audit verification**: S07 shows the sealed audit artifact. Independent verification: `docs/DEMO_ENGINEERING_GUIDE.md`.
+
 **PASS example:**
 
 ```bash
@@ -169,6 +209,19 @@ make demo-review
 # → Ed25519-signed review, DocTrust verifies, seals FAIL
 # → audit artifact with reviewer identity + final disposition
 ```
+
+### Credentials
+
+The canonical operator path is to export the Nutrient API key before running demos:
+
+```bash
+export NUTRIENT_DWS_EXTRACTION_API_KEY=your-key-here
+make demo-pass
+```
+
+The demo scripts inherit this from the shell environment. They do NOT source `.env`. The Go binary's `loadExtractionKey()` checks `os.Getenv("NUTRIENT_DWS_EXTRACTION_API_KEY")` first; `.env` is a fallback only when the variable is unset.
+
+**Quota note**: The maintainer's hackathon credential is quota-limited. Live re-execution is supported with an operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient Nutrient DWS quota. Frozen execution artifacts remain available for quota-free historical verification.
 
 **What DWS does (same line in README, video, and DevPost):**
 
@@ -469,6 +522,7 @@ allowlisted packages (`fmt`, `math`, `sort`, `strconv`, `strings`, `time`,
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
+| `NUTRIENT_DWS_EXTRACTION_API_KEY` | for live extraction | Nutrient DWS extraction credential; resolves from process env first, falls back to `.env` via `loadExtractionKey()` |
 | `OPENROUTER_API_KEY` | for author-check | LLM generation; fails closed if absent |
 | `OPENROUTER_MODEL` | no | Model override (default: claude-sonnet-4) |
 | `DOCTRUST_REVIEWER` | no | Reviewer identity recorded in approval.json |
@@ -491,10 +545,11 @@ allowlisted packages (`fmt`, `math`, `sort`, `strconv`, `strings`, `time`,
 | `bin/registry` | List all rulesets with versions |
 | `bin/registry --domain <domain>` | Show details for one ruleset |
 | `bin/server --domain <domain>` | HTTP API server |
-| `bin/doctrust-mcp --domain <domain> [--rulesets-dir D] [--snapshot-root D]` | MCP stdio server (6 tools: evaluate_case, get_findings, get_evidence, get_ruleset, request_human_review, get_audit_artifact) |
+| `bin/doctrust-mcp --domain <domain> [--rulesets-dir D] [--snapshot-root D]` | MCP stdio server (5 tools: evaluate_case, get_findings, get_evidence, get_ruleset, get_audit_artifact) |
 | `bin/evidence-mcp [--snapshot-root D] [--env-file F]` | MCP stdio provider adapter: build_evidence_snapshot / extend_evidence_snapshot (credentials load at runtime from env or .env file — never stored in agent config) |
 | `bin/ingest <dir>` | Income-domain extraction pipeline (legacy positional mode) |
 | `bin/ingest -domain shipment_release -docs type=path[,…] [--extend-from S] [--report F]` | Shipment evidence pipeline; extension produces a new content-derived case + provenance sidecar |
+| `bin/verify-audit <snapshot>` | Verify audit artifact integrity (snapshot hash, Ruleset binding, Ed25519 reviews) |
 | `scripts/rehearse-hermes-shipment.sh` | Real adaptive Hermes run + assertions A1–A10b |
 | `scripts/failure-rehearsals.sh` | Trust-boundary failure rehearsals F1–F5 |
 | `scripts/install-skill.sh` | Deploy canonical Compliance Skill to the Hermes runtime |
@@ -589,6 +644,9 @@ Verified-state documentation — what the current proof covers and where it ends
 - **Agent runs depend on free-tier model availability**
   (`nvidia/nemotron-3-ultra-550b-a55b:free`); unavailability is reported as an
   honest infrastructure failure, never silently substituted.
+- **Fixture provenance**. The 5,150 KG bill-of-lading mismatch was deliberately designed into the shipment-1047 fixture scenario to exercise the REVIEW/BLOCKING path. What is being demonstrated is the system's extraction, investigation, evidence reconciliation, authority boundary, and audit behavior — not discovery of a naturally occurring discrepancy.
+- **Attempt history**. The frozen artifacts do not retain a complete attempt count for the historical rehearsals; the documentation therefore makes no claim that the captured executions were first-attempt runs.
+- **Screen recording**. No continuous screen recording of the original Hermes session was retained. The interaction is independently verifiable through the recorded MCP transcripts, agent transcript, tool surface, evidence snapshots, and audit artifacts. The verification strength comes from the cross-linked evidence bundle, not any single artifact.
 
 ---
 

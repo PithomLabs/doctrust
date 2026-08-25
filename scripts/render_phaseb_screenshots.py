@@ -236,6 +236,9 @@ def render_s07():
         "",
         "  Created:  2026-08-24T17:59:03Z",
         "  Completed: 2026-08-24T17:59:03Z",
+        "",
+        "  Independent verification:",
+        "  docs/DEMO_ENGINEERING_GUIDE.md",
     ]
     img = render_text_block(lines, width=700)
     return save(img, "S07-audit-trail")
@@ -280,8 +283,9 @@ def render_s08():
     d.text((PAD, 385), "same evidence", font=font_sm, fill=FG_DIM)
     d.text((PAD, 410), "same audit", font=font_sm, fill=FG_DIM)
 
-    # Nutrient note
+    # Provider notes
     d.text((PAD, 450), "Nutrient = first provider", font=font_sm, fill=FG_ACCENT)
+    d.text((PAD, 475), "Foxit / Doctavian = future providers", font=font_sm, fill=FG_DIM)
 
     return save(img, "S08-feasibility-close")
 
