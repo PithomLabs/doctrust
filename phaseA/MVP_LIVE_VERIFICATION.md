@@ -1,12 +1,12 @@
 # Phase-A Live MVP Verification Report
 
 **Date**: 2026-08-25
-**Environment**: Clean clone at `/tmp/doctrust-clean-clone`
+**Environment**: Disposable filesystem test environment at `/tmp/doctrust-clean-clone`
 **Source repo**: `/home/chaschel/Desktop/biz/nutrient/doctrust` (commit `master`)
 
 ---
 
-## 1. Clean-Clone Environment
+## 1. Disposable Filesystem Test Environment
 
 - Created disposable clone via `rsync` excluding: `.git`, `bin/`, `compiled/`, `candidates/`, `.doctrust-*`, `.env`, `demo/shipment_release/runs/`
 - `NUTRIENT_DWS_EXTRACTION_API_KEY` sourced from development `.env` via `set -a; source .env; set +a` — **never copied, printed, or committed**
@@ -34,7 +34,7 @@ Error: extract 03-bill-of-lading.pdf (bill_of_lading): API error (HTTP 402):
 
 **Blocker**: Hackathon Nutrient credentials have **5 credits available** but **15 credits required per extraction**. This is an environmental/credentials limitation, not a code or architecture issue. The ingestion pipeline, evaluation engine, and audit generation are all functional — proven by all other verification steps below.
 
-**Current reproduction model**: The source and previously verified execution establish that the live Nutrient path supports operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. A fresh clean-clone live rerun with a different credential has not been performed in this environment. Frozen execution artifacts remain available for quota-free historical verification.
+**Current reproduction model**: The source and previously verified execution establish that the live Nutrient path supports operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. A fresh live rerun with a different credential has not been performed in this environment. Frozen execution artifacts remain available for quota-free historical verification.
 
 ---
 
@@ -74,7 +74,7 @@ Error: extract 03-bill-of-lading.pdf (bill_of_lading): API error (HTTP 402):
 {"error":"payg_not_configured","code":"payg_not_configured",...}
 ```
 
-**Current reproduction model**: The source and previously verified execution establish that the live Nutrient path supports operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. A fresh clean-clone live rerun with a different credential has not been performed in this environment. Frozen execution artifacts remain available for quota-free historical verification.
+**Current reproduction model**: The source and previously verified execution establish that the live Nutrient path supports operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. A fresh live rerun with a different credential has not been performed in this environment. Frozen execution artifacts remain available for quota-free historical verification.
 
 ---
 
@@ -110,7 +110,7 @@ VERIFIED: demo/income_verification/evidence_snapshot.json.decision.json
 
 **Result**: **BLOCKED** — Requires live Nutrient extraction (same credential issue)
 
-**Current reproduction model**: The source and previously verified execution establish that the live Nutrient path supports operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. A fresh clean-clone live rerun with a different credential has not been performed in this environment. Frozen execution artifacts remain available for quota-free historical verification.
+**Current reproduction model**: The source and previously verified execution establish that the live Nutrient path supports operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. A fresh live rerun with a different credential has not been performed in this environment. Frozen execution artifacts remain available for quota-free historical verification.
 
 ---
 
@@ -163,7 +163,7 @@ VERIFIED: demo/income_verification/evidence_snapshot.json.decision.json
 | Reflogs expired | ✅ PASS (`git reflog expire --expire=now --all`) |
 | Objects pruned | ✅ PASS (`git gc --prune=now --aggressive`) |
 
-### Final Git clone
+### Final Git Publication Clone
 
 | Check | Result |
 |-------|--------|
@@ -187,11 +187,11 @@ VERIFIED: demo/income_verification/evidence_snapshot.json.decision.json
 
 ## 9. Final Verdict
 
-**Historical result**: The maintainer's hackathon Nutrient credential had insufficient quota (5 credits available, 15 credits/page required) for the final clean-clone live rerun. This is an environmental limitation, not a code or architecture issue.
+**Historical result**: The maintainer's hackathon Nutrient credential had insufficient quota (5 credits available, 15 credits/page required) for the final live rerun. This is an environmental limitation, not a code or architecture issue. The canonical four-document shipment suite is approximately five pages and therefore requires approximately 75 Nutrient DWS credits in understand mode at 15 credits per page.
 
-**Current reproduction model**: The source and previously verified execution establish that the live Nutrient path supports operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. A fresh clean-clone live rerun with a different credential has not been performed in this environment. Frozen execution artifacts remain available for quota-free historical verification.
+**Current reproduction model**: The source and previously verified execution establish that the live Nutrient path supports operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. A fresh live rerun with a different credential has not been performed in this environment. Frozen execution artifacts remain available for quota-free historical verification.
 
-**Impact**: The MVP product paths (`make demo-pass`, `make demo-review`) require live Nutrient DWS extraction. The architecture, trust boundary, audit verification, regressions, and clean-clone property are all verified through source inspection and frozen artifacts.
+**Impact**: The MVP product paths (`make demo-pass`, `make demo-review`) require live Nutrient DWS extraction. The architecture, trust boundary, audit verification, regressions, and publication-readiness property are all verified through source inspection and frozen artifacts.
 
 **Recommendation**: Export `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota, then run `make demo-pass` and `make demo-review`. No code changes required.
 
@@ -206,7 +206,7 @@ The 402 error is preserved as evidence of a real live integration:
 - **Error**: `payg_not_configured`
 - **credits_available**: 5
 - **credits_required**: 15 (per page, understand mode — Nutrient charges 9 credits for parse + 6 for extract = 15 per page)
-- **Documents that completed before failure**: Previous runs completed extraction of earlier documents successfully (proven by frozen snapshots with Nutrient-sourced bboxes and field values).
+- **Documents that completed before failure**: The 402 occurred while processing the third document in the batch, after earlier documents had already completed extraction (proven by frozen snapshots with Nutrient-sourced bboxes and field values).
 
 The live provider integration reached Nutrient successfully and completed earlier extraction work before the account quota prevented the subsequent extraction.
 

@@ -168,8 +168,9 @@ hermes mcp add doctrust --command "$PWD/bin/doctrust-mcp" \
 hermes mcp add evidence --command "$PWD/bin/evidence-mcp" \
     --args --snapshot-root "$PWD/demo/shipment_release" --env-file "$PWD/.env"
 # evidence-mcp needs NUTRIENT_DWS_EXTRACTION_API_KEY.
-# Either export it in your shell, or pass --env-file pointing to a .env with the key.
-# If the binary runs from bin/, it auto-discovers doctrust/.env without the flag.
+# For the Hermes-managed subprocess: create .env from .env.example, put your key there.
+# The --env-file flag is the evidence-mcp/Hermes subprocess credential mechanism.
+# For bin/ingest: export NUTRIENT_DWS_EXTRACTION_API_KEY in your shell instead.
 
 bin/ingest -domain shipment_release \
     -docs "commercial_invoice=<pdf>,packing_list=<pdf>,bill_of_lading=<pdf>,certificate_of_origin=<pdf>" \
