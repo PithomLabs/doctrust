@@ -3,8 +3,8 @@
 **Purpose**: Forensic engineering documentation that lets a skeptical engineer verify the demo was real and trace every claim back to source code, execution artifacts, and resulting state.
 
 **Documentation basis**:
-- Source revision documented: `c3a6960575f8c24d7bdf5856193e621892a9e780` (commit message: "demo")
-- Documentation baseline revision: `be3d17716d4d97801cebab2e925bfd491c21224d`
+- Source revision documented: `6a0443a2a8e4a0452cbd4c017f137d0523aa323f` (post-scrub HEAD; all prior commit hashes rewritten by `git filter-repo` to remove historical `owner.key.enc` files)
+- Documentation baseline revision: `pending` (this commit)
 - Frozen execution artifacts:
   - Phase-5: `demo/shipment_release/runs/20260824-185232-341898`
   - Phase-6: `demo/shipment_release/runs/p6-20260825-015819-726232`
@@ -738,7 +738,7 @@ What the original Hermes rehearsal depended on outside the repo:
 | PDF fixtures | `/home/chaschel/Desktop/biz/nutrient/doc-generator/examples/shipment-1047/generated` | `rehearse-hermes-shipment.sh` sources fixtures from here, not from `demo/` |
 | Hermes binary | `$HOME/.local/bin/hermes` | Required for LLM agent execution |
 | Nutrient API key | `NUTRIENT_DWS_EXTRACTION_API_KEY` | Required for live extraction |
-| Nutrient quota | 15+ credits per 4-document extraction | The maintainer's hackathon credential is quota-limited. Live re-execution is supported with an operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. |
+| Nutrient quota | 15 credits/page (understand mode); ~75 credits for the canonical 4-document shipment suite (5 pages total) | The maintainer's hackathon credential is quota-limited. Live re-execution is supported with an operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. |
 | LLM model | `nvidia/nemotron-3-ultra-550b-a55b:free` | Hermes model for agent reasoning |
 
 The frozen artifacts inside the repo are self-contained for verification. Re-execution requires the external dependencies above.

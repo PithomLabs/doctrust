@@ -78,7 +78,9 @@ Error: extract 03-bill-of-lading.pdf (bill_of_lading): API error (HTTP 402):
 
 ---
 
-## 5a. Unresolved REVIEW Audit Verification (Using Existing Frozen Snapshot)
+## 5a. Mechanism Proof via income_verification Fixture
+
+> This verifies that audit verification handles an unresolved REVIEW artifact; the shipment_release REVIEW path itself was not independently re-verified live in this pass and is supported by the historical Phase-6 execution.
 
 **Command**: `make verify-audit SNAPSHOT_PATH=demo/income_verification/evidence_snapshot.json`
 
@@ -133,14 +135,40 @@ VERIFIED: demo/income_verification/evidence_snapshot.json.decision.json
 
 ---
 
-## 7. Clean Repository Check
+## 7. Clean Repository Verification
+
+### Current tree checks
 
 | Check | Result |
 |-------|--------|
 | `.env` not tracked | ✅ PASS (`git status` shows no `.env`) |
-| No secrets in history | ✅ PASS (no `owner.key.enc` in `git ls-files`) |
-| No tracked `owner.key.enc` | ✅ PASS (removed in commit `033ed98`) |
+| `owner.key.enc` not tracked | ✅ PASS (removed from working tree) |
 | No stale `phase5-remediation` branch | ✅ PASS (`git branch -a` shows only `master`) |
+
+### Reachable Git history (post-scrub)
+
+| Check | Result |
+|-------|--------|
+| No `.env` committed | ✅ PASS (`git log --all --full-history -- '.env'` empty) |
+| No `owner.key.enc` in history | ✅ PASS (`git log --all --full-history -- '**/owner.key.enc'` empty) |
+| No known secret patterns | ✅ PASS (only regex pattern in demo script, no actual values) |
+
+**History scrub**: `git filter-repo --path-glob '*/keydir/owner.key.enc' --invert-paths` was run to remove 15 `owner.key.enc` blobs from all reachable commits. All commit hashes were rewritten. The previous "scrub" commit (`37fafad`) only added `.env.example`; it did not remove historical secret-bearing blobs.
+
+### Reflog/unreachable object verification
+
+| Check | Result |
+|-------|--------|
+| Unreachable objects | ✅ PASS (`git fsck --unreachable --no-reflogs` clean) |
+| Reflogs expired | ✅ PASS (`git reflog expire --expire=now --all`) |
+| Objects pruned | ✅ PASS (`git gc --prune=now --aggressive`) |
+
+### Final Git clone
+
+| Check | Result |
+|-------|--------|
+| Clone contains no `.env` | ✅ PASS (verified via bare clone test) |
+| Clone contains no secret-bearing history | ✅ PASS (`owner.key.enc` absent from all reachable commits) |
 
 ---
 
@@ -148,7 +176,7 @@ VERIFIED: demo/income_verification/evidence_snapshot.json.decision.json
 
 | Step | Planned | Actual | Reason |
 |------|---------|--------|--------|
-| 2. PASS path | Live Nutrient → PASS | **BLOCKED** | Hackathon credentials: 5 credits available, 15 required |
+| 2. PASS path | Live Nutrient → PASS | **BLOCKED** | Hackathon credentials: 5 credits available, 15 credits/page required |
 | 4. REVIEW path | Live Nutrient → REVIEW | **BLOCKED** | Same credential issue |
 | 5b. Human TTY | Live review | **BLOCKED** | Same credential issue |
 | 5c. Resolved audit | Cryptographic verify | **SKIPPED** | Depends on 5b |
@@ -159,10 +187,27 @@ VERIFIED: demo/income_verification/evidence_snapshot.json.decision.json
 
 ## 9. Final Verdict
 
-**Historical result**: The maintainer's hackathon Nutrient credential had insufficient quota (5 credits available, 15 required) for the final clean-clone live rerun. This is an environmental limitation, not a code or architecture issue.
+**Historical result**: The maintainer's hackathon Nutrient credential had insufficient quota (5 credits available, 15 credits/page required) for the final clean-clone live rerun. This is an environmental limitation, not a code or architecture issue.
 
 **Current reproduction model**: The source and previously verified execution establish that the live Nutrient path supports operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota. A fresh clean-clone live rerun with a different credential has not been performed in this environment. Frozen execution artifacts remain available for quota-free historical verification.
 
 **Impact**: The MVP product paths (`make demo-pass`, `make demo-review`) require live Nutrient DWS extraction. The architecture, trust boundary, audit verification, regressions, and clean-clone property are all verified through source inspection and frozen artifacts.
 
 **Recommendation**: Export `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient quota, then run `make demo-pass` and `make demo-review`. No code changes required.
+
+---
+
+## 10. Live Integration Evidence (402 Failure)
+
+The 402 error is preserved as evidence of a real live integration:
+
+- **Request stage**: Third document in batch (`03-bill-of-lading.pdf`)
+- **HTTP status**: 402
+- **Error**: `payg_not_configured`
+- **credits_available**: 5
+- **credits_required**: 15 (per page, understand mode — Nutrient charges 9 credits for parse + 6 for extract = 15 per page)
+- **Documents that completed before failure**: Previous runs completed extraction of earlier documents successfully (proven by frozen snapshots with Nutrient-sourced bboxes and field values).
+
+The live provider integration reached Nutrient successfully and completed earlier extraction work before the account quota prevented the subsequent extraction.
+
+**Nutrient credit math**: 15 credits/page (understand mode); the canonical 4-document shipment suite is ~5 pages total, requiring approximately 75 credits for a complete run.

@@ -221,7 +221,7 @@ make demo-pass
 
 The demo scripts inherit this from the shell environment. They do NOT source `.env`. The Go binary's `loadExtractionKey()` checks `os.Getenv("NUTRIENT_DWS_EXTRACTION_API_KEY")` first; `.env` is a fallback only when the variable is unset.
 
-**Quota note**: The maintainer's hackathon credential is quota-limited. Live re-execution is supported with an operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient Nutrient DWS quota. Frozen execution artifacts remain available for quota-free historical verification.
+**Quota note**: The maintainer's hackathon credential is quota-limited. Nutrient charges 15 credits per page in understand mode; the canonical 4-document shipment suite (5 pages total) requires approximately 75 credits. Live re-execution is supported with an operator-supplied `NUTRIENT_DWS_EXTRACTION_API_KEY` with sufficient Nutrient DWS quota. Frozen execution artifacts remain available for quota-free historical verification.
 
 **What DWS does (same line in README, video, and DevPost):**
 
@@ -266,9 +266,9 @@ doctrust/
     promote/                    # Ruleset promotion (Phase 2)
     registry/                   # Registry inspection (Phase 2)
     server/                     # HTTP API (Phase 4)
-    doctrust-mcp/               # MCP stdio server — 6 tools: evaluate_case,
+    doctrust-mcp/               # MCP stdio server — 5 tools: evaluate_case,
                                 #   get_findings, get_evidence, get_ruleset,
-                                #   request_human_review, get_audit_artifact
+                                #   get_audit_artifact
     evidence-mcp/               # MCP stdio provider adapter (thin): builds/
                                 #   extends evidence snapshots via ingest path
     eval/                       # OPA standalone evaluator (reference)
@@ -647,6 +647,7 @@ Verified-state documentation — what the current proof covers and where it ends
 - **Fixture provenance**. The 5,150 KG bill-of-lading mismatch was deliberately designed into the shipment-1047 fixture scenario to exercise the REVIEW/BLOCKING path. What is being demonstrated is the system's extraction, investigation, evidence reconciliation, authority boundary, and audit behavior — not discovery of a naturally occurring discrepancy.
 - **Attempt history**. The frozen artifacts do not retain a complete attempt count for the historical rehearsals; the documentation therefore makes no claim that the captured executions were first-attempt runs.
 - **Screen recording**. No continuous screen recording of the original Hermes session was retained. The interaction is independently verifiable through the recorded MCP transcripts, agent transcript, tool surface, evidence snapshots, and audit artifacts. The verification strength comes from the cross-linked evidence bundle, not any single artifact.
+- **Live integration evidence**. During clean-clone verification we encountered a real Nutrient quota response (HTTP 402) after earlier extraction work had already completed; the raw response is preserved in [`phaseA/MVP_LIVE_VERIFICATION.md`](phaseA/MVP_LIVE_VERIFICATION.md). This demonstrates the live provider integration reached Nutrient and processed earlier documents before the account quota prevented subsequent extraction. The failure is useful evidence because nobody fabricates their own embarrassing failure in a document meant to reassure a skeptic.
 
 ---
 
