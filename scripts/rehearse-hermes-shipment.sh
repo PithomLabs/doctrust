@@ -15,7 +15,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HERMES="${HERMES:-$HOME/.local/bin/hermes}"
 MODEL="${PHASE5_MODEL:-nvidia/nemotron-3-ultra-550b-a55b:free}"
 SKILL="compliance-check-artifact"
-FROZEN="/home/chaschel/Desktop/biz/nutrient/doc-generator/examples/shipment-1047/generated"
+FROZEN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/demo/shipment_release/fixtures/pass"
 WORKSPACE="$ROOT/demo/shipment_release"
 
 command -v "$HERMES" >/dev/null || { echo "FATAL: hermes not found"; exit 1; }

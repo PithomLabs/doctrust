@@ -2,7 +2,7 @@
 
 > DocTrust is a compliance execution layer that lets AI agents investigate business documents against approved policy — without ever letting the agent become the authority that decides compliance.
 
-**Demo target:** September 4, 2026 · **Business case:** [`BUSINESS_CASE.md`](BUSINESS_CASE.md)
+**Business case:** [`BUSINESS_CASE.md`](BUSINESS_CASE.md)
 
 ## Problem
 
@@ -119,13 +119,13 @@ bin/verify-ruleset --domain shipment_release
 
 Verifies: the promoted shipment_release Ruleset and its manifest integrity.
 
-**2. Audit integrity**
+**2. Audit integrity (publication-verification artifacts)**
 
 ```bash
-bin/verify-audit demo/shipment_release/runs/p6-20260825-015819-726232/available/evidence_snapshot.json
+bin/verify-audit demo/shipment_release/publication-verification/p6-20260825-015819-726232/available/evidence_snapshot.json
 ```
 
-Verifies: the recorded audit artifact, snapshot binding, Ruleset binding, and Ed25519 signature integrity.
+Verifies: the publication-verification audit artifact, snapshot binding, Ruleset binding, and Ed25519 signature integrity. These are freshly re-signed artifacts separate from the historical execution run.
 
 **3. Agent authority boundary**
 

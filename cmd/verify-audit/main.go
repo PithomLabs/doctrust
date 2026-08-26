@@ -115,6 +115,15 @@ func main() {
 		}
 	}
 
+	// Verify audit artifact if present
+	auditPath := snapshotPath + ".audit.json"
+	if _, err := os.Stat(auditPath); err == nil {
+		if err := verifyAuditArtifact(auditPath, &sidecar, snapshotPath, reviewsPath); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: audit artifact verification failed: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	// Success
 	fmt.Printf("VERIFIED: %s\n", decisionPath)
 	fmt.Printf("  snapshot_sha256: %s\n", sidecar.SnapshotSHA256[:16]+"...")
@@ -334,6 +343,209 @@ func verifyHumanReviews(reviewsPath string, sidecar DecisionSidecar, reviewersRi
 		fmt.Printf("    finding[%d] %s by %s (key=%s)\n", rec.FindingIndex, rec.Action, rec.ReviewerIdentity, rec.KeyID)
 	}
 	return nil
+}
+
+// auditArtifact is the on-disk audit artifact structure.
+type auditArtifact struct {
+	Version          string              `json:"version"`
+	PolicyID         string              `json:"policy_id"`
+	PolicyHash       string              `json:"policy_hash"`
+	RulesetID        string              `json:"ruleset_id"`
+	RulesetVersion   string              `json:"ruleset_version"`
+	RulesetHash      string              `json:"ruleset_hash"`
+	Decisions        []auditDecision     `json:"decisions"`
+	Documents        []auditDocument     `json:"documents"`
+	HumanReviews     []auditHumanReview  `json:"human_reviews,omitempty"`
+	FinalDisposition string              `json:"final_disposition,omitempty"`
+	CreatedAt        string              `json:"created_at,omitempty"`
+	CompletedAt      *string             `json:"completed_at,omitempty"`
+	Manifest         auditManifest       `json:"manifest"`
+}
+
+type auditDecision struct {
+	CaseID    string         `json:"case_id"`
+	State     string         `json:"state"`
+	Findings  []auditFinding `json:"findings"`
+	DecidedAt string         `json:"decided_at"`
+}
+
+type auditFinding struct {
+	Rule     string  `json:"rule"`
+	Severity string  `json:"severity"`
+	ClaimA   string  `json:"claim_a"`
+	ClaimB   string  `json:"claim_b"`
+	ValueA   float64 `json:"value_a"`
+	ValueB   float64 `json:"value_b"`
+}
+
+type auditDocument struct {
+	FileName    string  `json:"file_name"`
+	DocType     string  `json:"doc_type"`
+	Hash        string  `json:"hash"`
+	ExtractedAt string  `json:"extracted_at"`
+	Confidence  float64 `json:"confidence"`
+}
+
+type auditHumanReview struct {
+	FindingIndex     int    `json:"finding_index"`
+	Action           string `json:"action"`
+	Note             string `json:"note"`
+	ResolvedAt       string `json:"resolved_at"`
+	ReviewerIdentity string `json:"reviewer_identity,omitempty"`
+	Channel          string `json:"channel,omitempty"`
+}
+
+type auditManifest struct {
+	DocCount      int    `json:"doc_count"`
+	DecisionCount int    `json:"decision_count"`
+	ReviewCount   int    `json:"review_count"`
+	ArtifactHash  string `json:"artifact_hash"`
+}
+
+// hashableAudit is the canonical representation for artifact hash computation.
+// Manifest.ArtifactHash is excluded to break the self-referential cycle.
+type hashableAudit struct {
+	Version          string              `json:"version"`
+	PolicyID         string              `json:"policy_id"`
+	PolicyHash       string              `json:"policy_hash"`
+	RulesetID        string              `json:"ruleset_id"`
+	RulesetVersion   string              `json:"ruleset_version"`
+	RulesetHash      string              `json:"ruleset_hash"`
+	Decisions        []auditDecision     `json:"decisions"`
+	Documents        []auditDocument     `json:"documents"`
+	HumanReviews     []auditHumanReview  `json:"human_reviews,omitempty"`
+	FinalDisposition string              `json:"final_disposition,omitempty"`
+	CreatedAt        string              `json:"created_at,omitempty"`
+	CompletedAt      *string             `json:"completed_at,omitempty"`
+	Manifest         struct {
+		DocCount      int `json:"doc_count"`
+		DecisionCount int `json:"decision_count"`
+		ReviewCount   int `json:"review_count"`
+	} `json:"manifest"`
+}
+
+func verifyAuditArtifact(auditPath string, sidecar *DecisionSidecar, snapshotPath, reviewsPath string) error {
+	data, err := os.ReadFile(auditPath)
+	if err != nil {
+		return fmt.Errorf("read audit artifact: %w", err)
+	}
+
+	var artifact auditArtifact
+	if err := json.Unmarshal(data, &artifact); err != nil {
+		return fmt.Errorf("parse audit artifact: %w", err)
+	}
+
+	// 1. Verify ruleset binding matches decision sidecar
+	if artifact.RulesetHash != sidecar.Ruleset.Hash {
+		return fmt.Errorf("audit ruleset_hash mismatch: audit=%s sidecar=%s", artifact.RulesetHash, sidecar.Ruleset.Hash)
+	}
+	if artifact.RulesetID != sidecar.Ruleset.ID {
+		return fmt.Errorf("audit ruleset_id mismatch: audit=%s sidecar=%s", artifact.RulesetID, sidecar.Ruleset.ID)
+	}
+
+	// 2. Verify document hashes match snapshot
+	snapshotData, err := os.ReadFile(snapshotPath)
+	if err != nil {
+		return fmt.Errorf("read snapshot for document verification: %w", err)
+	}
+	var snapshot struct {
+		Documents []struct {
+			Hash string `json:"hash"`
+		} `json:"documents"`
+	}
+	if err := json.Unmarshal(snapshotData, &snapshot); err != nil {
+		return fmt.Errorf("parse snapshot for document verification: %w", err)
+	}
+	snapshotHashes := make(map[string]bool)
+	for _, d := range snapshot.Documents {
+		snapshotHashes[d.Hash] = true
+	}
+	for _, doc := range artifact.Documents {
+		if doc.Hash != "" && !snapshotHashes[doc.Hash] {
+			return fmt.Errorf("audit document hash %s not found in snapshot", doc.Hash)
+		}
+	}
+
+	// 3. Verify final disposition consistency with decision status
+	if len(sidecar.Findings) > 0 {
+		hasReview := false
+		for _, f := range sidecar.Findings {
+			if f.Status == "REVIEW" {
+				hasReview = true
+			}
+		}
+		switch sidecar.Status {
+		case "PASS":
+			if artifact.FinalDisposition != "" && artifact.FinalDisposition != "PASS" {
+				return fmt.Errorf("audit final_disposition=%s inconsistent with decision status=PASS", artifact.FinalDisposition)
+			}
+		case "REVIEW":
+			if hasReview && artifact.FinalDisposition != "FAIL" && artifact.FinalDisposition != "REVIEW" {
+				return fmt.Errorf("audit final_disposition=%s inconsistent with REVIEW decision", artifact.FinalDisposition)
+			}
+		case "FAIL":
+			if artifact.FinalDisposition != "FAIL" {
+				return fmt.Errorf("audit final_disposition=%s inconsistent with FAIL decision", artifact.FinalDisposition)
+			}
+		}
+	}
+
+	// 4. Verify human_reviews[] linkage to review sidecar
+	if _, err := os.Stat(reviewsPath); err == nil {
+		sc, err := review.LoadReviewsSidecar(reviewsPath)
+		if err != nil {
+			return fmt.Errorf("load reviews sidecar for audit verification: %w", err)
+		}
+		// Build lookup of sidecar records by finding_index
+		sidecarRecords := make(map[int]review.SignedReview)
+		for _, rec := range sc.Records {
+			sidecarRecords[rec.FindingIndex] = rec
+		}
+		for i, hr := range artifact.HumanReviews {
+			rec, ok := sidecarRecords[hr.FindingIndex]
+			if !ok {
+				return fmt.Errorf("audit human_reviews[%d] finding_index %d not found in review sidecar", i, hr.FindingIndex)
+			}
+			if hr.Action != string(rec.Action) {
+				return fmt.Errorf("audit human_reviews[%d] action mismatch: audit=%s sidecar=%s", i, hr.Action, rec.Action)
+			}
+			if hr.ReviewerIdentity != "" && hr.ReviewerIdentity != rec.ReviewerIdentity {
+				return fmt.Errorf("audit human_reviews[%d] reviewer_identity mismatch: audit=%s sidecar=%s", i, hr.ReviewerIdentity, rec.ReviewerIdentity)
+			}
+		}
+	}
+
+	// 5. Verify artifact_hash (recompute from canonical content)
+	recomputed := recomputeAuditHash(&artifact)
+	if recomputed != artifact.Manifest.ArtifactHash {
+		return fmt.Errorf("audit artifact_hash mismatch: expected %s, got %s", artifact.Manifest.ArtifactHash, recomputed)
+	}
+
+	fmt.Printf("  audit artifact: VERIFIED (hash=%s...)\n", artifact.Manifest.ArtifactHash[:16])
+	return nil
+}
+
+func recomputeAuditHash(a *auditArtifact) string {
+	h := hashableAudit{
+		Version:          a.Version,
+		PolicyID:         a.PolicyID,
+		PolicyHash:       a.PolicyHash,
+		RulesetID:        a.RulesetID,
+		RulesetVersion:   a.RulesetVersion,
+		RulesetHash:      a.RulesetHash,
+		Decisions:        a.Decisions,
+		Documents:        a.Documents,
+		HumanReviews:     a.HumanReviews,
+		FinalDisposition: a.FinalDisposition,
+		CreatedAt:        a.CreatedAt,
+		CompletedAt:      a.CompletedAt,
+	}
+	h.Manifest.DocCount = a.Manifest.DocCount
+	h.Manifest.DecisionCount = a.Manifest.DecisionCount
+	h.Manifest.ReviewCount = a.Manifest.ReviewCount
+	data, _ := json.Marshal(h)
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:])
 }
 
 // copy of io functions we need

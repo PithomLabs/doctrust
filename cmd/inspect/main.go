@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	data, _ := os.ReadFile("/home/chaschel/Desktop/biz/nutrient/doctrust/.env")
+	data, _ := os.ReadFile(".env")
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
 		if i := strings.Index(line, "="); i >= 0 {

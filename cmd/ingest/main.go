@@ -79,7 +79,7 @@ func main() {
 	// Load API key
 	extractionKey := os.Getenv("NUTRIENT_DWS_EXTRACTION_API_KEY")
 	if extractionKey == "" {
-		data, err := os.ReadFile("/home/chaschel/Desktop/biz/nutrient/.env")
+		data, err := os.ReadFile(".env")
 		if err == nil {
 			for _, line := range strings.Split(string(data), "\n") {
 				line = strings.TrimSpace(line)

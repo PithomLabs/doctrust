@@ -6,9 +6,9 @@
 # NEVER modifies judge-demo.sh or demo state. Consumes recorded live output only.
 set -uo pipefail
 
-REPO="/home/chaschel/Desktop/biz/nutrient/doctrust"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CANON="$REPO/docs/demo/screenshots"
-MIRROR="/home/chaschel/Desktop/biz/nutrient/plans8/screenshots"
+MIRROR="${MIRROR:-$REPO/../plans8/screenshots}"
 LOGROOT="${LOGROOT:-/tmp/judge-demo-capture-$(date +%H%M%S)}"
 mkdir -p "$LOGROOT" "$CANON" "$MIRROR"
 
@@ -88,7 +88,7 @@ for k,title in names.items():
     for l in lines:
         d.text((PAD,y),l,font=font,fill="#e6edf3"); y+=FS+10
     img=img.resize((w*SCALE,h*SCALE),Image.LANCZOS)
-    out=f"/home/chaschel/Desktop/biz/nutrient/doctrust/docs/demo/screenshots/{names[k]}.png"
+    out=f"{os.environ.get('REPO', os.path.dirname(os.path.dirname(os.path.abspath(__file__))))}/docs/demo/screenshots/{names[k]}.png"
     img.save(out)
     print("wrote",out,img.size)
 PY

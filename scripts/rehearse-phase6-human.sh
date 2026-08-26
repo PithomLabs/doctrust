@@ -12,7 +12,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PY="${PYTHON:-python3}"
-FROZEN="/home/chaschel/Desktop/biz/nutrient/doc-generator/examples/shipment-1047/generated"
+FROZEN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/demo/shipment_release/fixtures/anomaly"
 WORKSPACE="$ROOT/demo/shipment_release"
 REVIEWER="owner"
 # Test-only default passphrase; use PHASE6_PASSPHRASE env for real runs.

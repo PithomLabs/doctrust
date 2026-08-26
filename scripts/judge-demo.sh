@@ -5,7 +5,7 @@
 # Runs the REAL binaries inside an isolated sandbox. Nothing mocked, nothing canned.
 set -uo pipefail
 
-REPO="/home/chaschel/Desktop/biz/nutrient/doctrust"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOGROOT="/tmp/judge-demo-logs"
 mkdir -p "$LOGROOT"
 LOG="$LOGROOT/demo_$(date +%H%M%S).log"

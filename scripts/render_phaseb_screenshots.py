@@ -8,7 +8,7 @@ import os
 import json
 from PIL import Image, ImageDraw, ImageFont
 
-REPO = "/home/chaschel/Desktop/biz/nutrient/doctrust"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(REPO, "demo", "assets")
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"

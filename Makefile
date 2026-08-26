@@ -1,4 +1,4 @@
-.PHONY: build run test ingest clean setup demo-pdfs check-policy test-policy validate-fixtures eval compile-policy test-compiler server regression promote registry mcp author-check review-check promote-check verify-ruleset verify-audit
+.PHONY: build run test ingest clean setup demo-pdfs check-policy test-policy validate-fixtures eval compile-policy test-compiler server regression promote registry mcp author-check review-check promote-check verify-ruleset verify-audit resign-publication
 
 # Build all binaries
 build:
@@ -18,6 +18,7 @@ build:
 	go build -o bin/doctrust-mcp ./cmd/doctrust-mcp/
 	go build -o bin/doctrust-review ./cmd/doctrust-review/
 	go build -o bin/verify-audit ./cmd/verify-audit/
+	go build -o bin/resign-publication ./cmd/resign-publication/
 
 # Run the ingest pipeline on demo documents
 run: build
