@@ -1,0 +1,10 @@
+phase6-hold-passphrase
+0
+confirm
+Required documents present and corroborated.
+0
+1
+reject
+HOLD - gross weight mismatch vs corroborating documents
+1
+done

@@ -1,0 +1,43 @@
+{
+  "case_id": "9485e5c91922bb00",
+  "records": [
+    {
+      "case_id": "9485e5c91922bb00",
+      "graph_case_id": "shipment_80ae654404eff2c9",
+      "snapshot_sha256": "9485e5c91922bb000996e818ccca1181440feb2e4102ad3ea6217c3288e1dcbd",
+      "finding_index": 0,
+      "action": "confirm",
+      "note": "Required documents present and corroborated.",
+      "reviewer_identity": "owner",
+      "channel": "human-tty",
+      "key_id": "owner",
+      "alg": "ed25519",
+      "ruleset": {
+        "id": "shipment_release",
+        "version": "1",
+        "hash": "d3f1a945867942c369295ce4105e070d16e7e2defce00d4d80aa4f72d934f834"
+      },
+      "resolved_at": "2026-08-24T21:21:42.888129927Z",
+      "signature": "j9Ny7o8OulW+w7utp02s4YBkJQbIOVwPv93BzB7ODfCvaRPjzpjhpE7IEkL3oIzT0JOTDH+GA3gxMSdWabPwBQ=="
+    },
+    {
+      "case_id": "9485e5c91922bb00",
+      "graph_case_id": "shipment_80ae654404eff2c9",
+      "snapshot_sha256": "9485e5c91922bb000996e818ccca1181440feb2e4102ad3ea6217c3288e1dcbd",
+      "finding_index": 1,
+      "action": "reject",
+      "note": "HOLD - gross weight mismatch vs corroborating documents",
+      "reviewer_identity": "owner",
+      "channel": "human-tty",
+      "key_id": "owner",
+      "alg": "ed25519",
+      "ruleset": {
+        "id": "shipment_release",
+        "version": "1",
+        "hash": "d3f1a945867942c369295ce4105e070d16e7e2defce00d4d80aa4f72d934f834"
+      },
+      "resolved_at": "2026-08-24T21:21:42.889542837Z",
+      "signature": "JGdn2AtXciFLRYttwWPMsKbBcrRiElATx44kfSnPu8b5q/TyiTPK9IsH2ez12sdF4u1fIAjupXKOa/satdDbCA=="
+    }
+  ]
+}

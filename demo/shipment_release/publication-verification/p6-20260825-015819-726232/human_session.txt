@@ -1,0 +1,37 @@
+phase6-hold-passphrase
+0
+confirm
+Required documents present and corroborated.
+0
+1
+reject
+HOLD - gross weight mismatch vs corroborating documents
+1
+done
+
+Human authority required — case 56cf311f09d45996
+Ruleset: shipment_release v1 (hash d3f1a9458679…)
+Snapshot sha256: 56cf311f09d45996…
+  [0] required_shipment_documents      PASS / INFO
+      all 4 required shipment documents present
+  [1] gross_weight_reconciliation      REVIEW / BLOCKING
+      gross weight reconciliation failed: commercial_invoice, packing_list, certificate_of_origin, bill_of_lading differ (commercial_invoice=4650.00 KG, packing_li...
+      · shipment.gross_weight @ page=1;bbox=[459.0,288.0,50.4,7.9] (conf 0.95)
+      · shipment.gross_weight @ page=1;bbox=[493.9,380.9,53.6,7.9] (conf 0.95)
+      · shipment.gross_weight @ page=1;bbox=[511.9,349.9,50.8,6.8] (conf 0.95)
+      · shipment.gross_weight @ page=2;bbox=[423.0,466.9,33.8,6.8] (conf 0.95)
+
+reviewer passphrase (unlocks signing key): 
+signing key unlocked: key_id="owner"
+
+finding index to resolve (or 'done'): action for [0] required_shipment_documents — confirm/reject/override (or 'skip'): note (optional): type the finding index 0 to sign this decision:   signed (1 record(s) pending write)
+
+finding index to resolve (or 'done'): action for [1] gross_weight_reconciliation — confirm/reject/override (or 'skip'): note (optional): type the finding index 1 to sign this decision:   signed (2 record(s) pending write)
+
+finding index to resolve (or 'done'): 
+2 signed record(s) written to:
+  /home/chaschel/Desktop/biz/nutrient/doctrust/demo/shipment_release/runs/p6-20260825-015819-726232/available/evidence_snapshot.json.doctrust_reviews.json
+
+FINAL DISPOSITION: FAIL
+artifact: /home/chaschel/Desktop/biz/nutrient/doctrust/demo/shipment_release/runs/p6-20260825-015819-726232/available/evidence_snapshot.json.audit.json
+artifact_hash: b2cc19a7309968b38d764808cba4b0024841238284e9c6bfc1edbf0229c39ac5

@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"evaluate_case","arguments":{"snapshot_path":"/home/chaschel/Desktop/biz/nutrient/doctrust/demo/shipment_release/runs/p6-20260825-052059-908199/available/evidence_snapshot.json"}}}

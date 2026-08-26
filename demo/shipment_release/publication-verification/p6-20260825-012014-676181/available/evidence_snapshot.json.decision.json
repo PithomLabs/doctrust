@@ -1,0 +1,69 @@
+{
+  "loadcase_id": "5f48ac09e214462a",
+  "graph_case_id": "shipment_e067246b18486d8b",
+  "snapshot_sha256": "5f48ac09e214462ab72ed0db23990468b81bc436d3bf72bb6b23dce0b5414686",
+  "status": "REVIEW",
+  "findings": [
+    {
+      "index": 0,
+      "check_id": "required_shipment_documents",
+      "status": "PASS",
+      "severity": "INFO",
+      "reason": "all 4 required shipment documents present",
+      "metrics": {
+        "required_count": 4
+      }
+    },
+    {
+      "index": 1,
+      "check_id": "gross_weight_reconciliation",
+      "status": "REVIEW",
+      "severity": "BLOCKING",
+      "reason": "gross weight reconciliation failed: commercial_invoice, packing_list, certificate_of_origin, bill_of_lading differ (commercial_invoice=4650.00 KG, packing_list=4650.00 KG, certificate_of_origin=4650.00 KG, bill_of_lading=5150.00 KG); outliers: bill_of_lading",
+      "metrics": {
+        "condition": "all_equal",
+        "observations": {
+          "bill_of_lading": 5150,
+          "certificate_of_origin": 4650,
+          "commercial_invoice": 4650,
+          "packing_list": 4650
+        },
+        "outliers": [
+          "bill_of_lading"
+        ],
+        "unit": "KG"
+      },
+      "evidence": [
+        {
+          "field": "shipment.gross_weight",
+          "source_doc": "bill_of_lading",
+          "source_span": "page=1;bbox=[459.0,288.0,50.4,7.9]",
+          "confidence": 0.95
+        },
+        {
+          "field": "shipment.gross_weight",
+          "source_doc": "certificate_of_origin",
+          "source_span": "page=1;bbox=[493.9,380.9,53.6,7.9]",
+          "confidence": 0.95
+        },
+        {
+          "field": "shipment.gross_weight",
+          "source_doc": "commercial_invoice",
+          "source_span": "page=1;bbox=[511.9,349.9,50.8,6.8]",
+          "confidence": 0.95
+        },
+        {
+          "field": "shipment.gross_weight",
+          "source_doc": "packing_list",
+          "source_span": "page=2;bbox=[423.0,466.9,33.8,6.8]",
+          "confidence": 0.95
+        }
+      ]
+    }
+  ],
+  "ruleset": {
+    "id": "shipment_release",
+    "version": "1",
+    "hash": "d3f1a945867942c369295ce4105e070d16e7e2defce00d4d80aa4f72d934f834"
+  }
+}

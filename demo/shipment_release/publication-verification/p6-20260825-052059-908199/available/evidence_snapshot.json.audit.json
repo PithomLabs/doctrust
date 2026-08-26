@@ -1,0 +1,90 @@
+{
+  "version": "1.0",
+  "policy_id": "shipment_release",
+  "policy_hash": "9485e5c91922bb000996e818ccca1181440feb2e4102ad3ea6217c3288e1dcbd",
+  "ruleset_id": "shipment_release",
+  "ruleset_version": "1",
+  "ruleset_hash": "d3f1a945867942c369295ce4105e070d16e7e2defce00d4d80aa4f72d934f834",
+  "decisions": [
+    {
+      "case_id": "9485e5c91922bb00",
+      "state": "REVIEW",
+      "findings": [
+        {
+          "rule": "required_shipment_documents",
+          "severity": "INFO",
+          "claim_a": "required_shipment_documents",
+          "claim_b": "",
+          "value_a": 0,
+          "value_b": 0
+        },
+        {
+          "rule": "gross_weight_reconciliation",
+          "severity": "BLOCKING",
+          "claim_a": "gross_weight_reconciliation",
+          "claim_b": "",
+          "value_a": 0,
+          "value_b": 0
+        }
+      ],
+      "decided_at": "0001-01-01T00:00:00Z"
+    }
+  ],
+  "documents": [
+    {
+      "file_name": "03-bill-of-lading.pdf",
+      "doc_type": "bill_of_lading",
+      "hash": "1ceeb658b1040b3bfe2fe67f177b82cc59af6d784a8ff4a5256eddec3ad8767b",
+      "extracted_at": "0001-01-01T00:00:00Z",
+      "confidence": 0
+    },
+    {
+      "file_name": "04-certificate-of-origin.pdf",
+      "doc_type": "certificate_of_origin",
+      "hash": "e60eaf0e6b8eb239135a0749171581973f7b3481aa5cf7da276fb5b06076faef",
+      "extracted_at": "0001-01-01T00:00:00Z",
+      "confidence": 0
+    },
+    {
+      "file_name": "01-commercial-invoice.pdf",
+      "doc_type": "commercial_invoice",
+      "hash": "5d92458aeec03c4856cc9cafd3a4b79f300d657160d1d6d0520956ee0bc3b7dd",
+      "extracted_at": "0001-01-01T00:00:00Z",
+      "confidence": 0
+    },
+    {
+      "file_name": "02-packing-list.pdf",
+      "doc_type": "packing_list",
+      "hash": "950f1a5a1b2ba11c5a1a73d859c7a85f994c64964abe71a531269398e82e5be9",
+      "extracted_at": "0001-01-01T00:00:00Z",
+      "confidence": 0
+    }
+  ],
+  "human_reviews": [
+    {
+      "finding_index": 0,
+      "action": "confirm",
+      "note": "Required documents present and corroborated.",
+      "resolved_at": "2026-08-26T02:14:34.361965429Z",
+      "reviewer_identity": "owner",
+      "channel": "human-tty"
+    },
+    {
+      "finding_index": 1,
+      "action": "reject",
+      "note": "HOLD - gross weight mismatch vs corroborating documents",
+      "resolved_at": "2026-08-26T02:14:34.36196581Z",
+      "reviewer_identity": "owner",
+      "channel": "human-tty"
+    }
+  ],
+  "final_disposition": "FAIL",
+  "created_at": "2026-08-26T02:14:34.361966001Z",
+  "completed_at": "2026-08-26T02:14:34.361967473Z",
+  "manifest": {
+    "doc_count": 4,
+    "decision_count": 1,
+    "review_count": 1,
+    "artifact_hash": "b7287b76321a94f180cade9f1813f9e0160ea3de7c9a83806bc0cc74dd66a923"
+  }
+}

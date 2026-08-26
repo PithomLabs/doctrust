@@ -1,0 +1,2 @@
+{"jsonrpc":"2.0","id":10,"method":"tools/list","params":{}}
+{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"request_human_review","arguments":{"case_id":"shipment_e067246b18486d8b","finding_index":1,"action":"reject"}}}
