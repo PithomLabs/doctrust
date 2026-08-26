@@ -3,7 +3,7 @@
 **Purpose**: Forensic engineering documentation that lets a skeptical engineer verify the demo was real and trace every claim back to source code, execution artifacts, and resulting state.
 
 **Documentation basis**:
-- Source revision documented: `686a77cbd519c24f4fe26cba29561b9fd4762b29` (module-path migration HEAD; github.com/doctrust/doctrust → github.com/PithomLabs/doctrust)
+- Source revision documented: `d3052de6080c033ad8e4433fc4c4593592342011` (public-repository cleanup HEAD; removed historical bin/, transient runs, planning artifacts)
 - History scrub: two `git filter-repo` invocations removed secret-bearing files from reachable history: (1) `.env` + secret value replacement (documented in commit `6c82689` — "A1 hygiene: git filter-repo scrub .env + replace-text for secrets"), verified via pre-scrub backup `.git.backup-20260826/`; (2) `owner.key.enc` removal (prompt10 scrub). No independent secret-scanning tool was available in the execution environment. Secret-history hygiene was verified through full-history path inspection, pre-scrub backup inspection, reflog/unreachable-object verification, and final Git-clone verification.
 - Documentation baseline revision: `2ce41d5` (this commit)
 - Frozen execution artifacts:
