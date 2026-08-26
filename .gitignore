@@ -31,3 +31,7 @@ go.work
 
 .gut
 demo/shipment_release/runs/
+
+# Generated binaries (built from source)
+/resign-publication
+/verify-audit
