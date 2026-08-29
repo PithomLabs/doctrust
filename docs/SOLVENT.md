@@ -78,7 +78,7 @@ The broader idea is simple:
 
 The strongest argument for Solvent is not a regulation. It is the failure mode that appears when an agent is trusted to interpret data and then act with legitimate permissions.
 
-Tenet Security's 2026 GhostJacking research describes an agentic attack chain in which attacker-controlled information can enter through trusted telemetry or logs, influence an agent, and result in actions being taken through permissions the organization had already granted. The researchers reported 9-of-10 success against Claude Code in the tested configuration and demonstrated scenarios involving trusted platforms and consequential actions. The important lesson is independent of the exact exploit details: **an attacker does not always need to break the tool when they can influence what the agent believes and then let the agent's legitimate authority do the rest.** citeturn235230search7
+Tenet Security's 2026 GhostJacking research describes an agentic attack chain in which attacker-controlled information can enter through trusted telemetry or logs, influence an agent, and result in actions being taken through permissions the organization had already granted. The researchers reported 9-of-10 success against Claude Code in the tested configuration and demonstrated scenarios involving trusted platforms and consequential actions. The important lesson is independent of the exact exploit details: **an attacker does not always need to break the tool when they can influence what the agent believes and then let the agent's legitimate authority do the rest.** 
 
 That is the problem Solvent attacks.
 
@@ -287,6 +287,6 @@ That is Solvent.
 ## Accuracy / Positioning Notes
 
 - Regulatory mappings in this document are **illustrative product mappings**, not legal opinions or claims that a regulation requires Solvent's exact schema.
-- The EU AI Act explicitly requires effective human oversight for high-risk AI systems, but organizations may satisfy those obligations through different technical and organizational measures. citeturn235230search8
-- FDA's QMSR became effective on February 2, 2026 and incorporates ISO 13485:2016 for covered medical-device quality systems; this document therefore uses the FDA/QMSR context as a control environment rather than claiming that Solvent's debt items are prescribed by FDA. citeturn235230search0turn235230search1
+- The EU AI Act explicitly requires effective human oversight for high-risk AI systems, but organizations may satisfy those obligations through different technical and organizational measures. 
+- FDA's QMSR became effective on February 2, 2026 and incorporates ISO 13485:2016 for covered medical-device quality systems; this document therefore uses the FDA/QMSR context as a control environment rather than claiming that Solvent's debt items are prescribed by FDA. 
 - GhostJacking is used here as a **security problem statement**, not as proof that Solvent is already a required control. The research describes agent hijacking through trusted data and already-authorized tooling; Solvent's thesis is that an explicit authorization boundary can reduce the chance that an agent's interpretation of untrusted information automatically becomes consequential action. citeturn235230search7
