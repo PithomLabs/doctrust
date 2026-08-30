@@ -1,25 +1,79 @@
 # DocTrust — Universal Document Compliance Engine
 
-> DocTrust is a compliance execution layer that lets AI agents investigate business documents against approved policy — without ever letting the agent become the authority that decides compliance.
+> DocTrust is an evidence-driven compliance engine that lets AI agents investigate consequential workflows against approved policy — without letting the agent become the authority that decides compliance.
 
 **Business case:** [`BUSINESS_CASE.md`](BUSINESS_CASE.md)
+**YouTube demo:** [https://www.youtube.com/watch?v=LbNnzZoPEPw](https://www.youtube.com/watch?v=LbNnzZoPEPw)
+
+**For judges:** start with the [60-Second Verification](#60-second-verification), then watch the YouTube demo.
+**For engineers:** the architecture, invariants, MCP surface, and verification commands below show exactly where the trust boundaries live.
+
 
 ## Problem
 
-Regulated document workflows — trade compliance, KYC/AML, insurance claims, mortgage appraisal, e-invoicing — either rely on manual reconciliation that doesn't scale, or on “AI reads the PDF” tools whose decisions are unauditable and indefensible to a regulator. DocTrust solves the authority gap: agents can investigate, but only approved Rulesets evaluated deterministically (plus a signed human authority when required) can decide compliance. Shipment release — a single gross-weight mismatch across four trade documents triggering customs penalties — makes the cost concrete and is the first vertical wedge.
+### The problem in one sentence
 
-Nutrient extraction → frozen evidence → deterministic evaluation → human review → audit artifact.
-AI-authored rules enter through a human-gated trust funnel before reaching the runtime.
-The agent-facing runtime ships as MCP tools (`doctrust-mcp` · `evidence-mcp`),
-operated by AI agents (Hermes or any MCP-capable harness) under a compliance skill:
-**the agent investigates; DocTrust enforces the approved policy.**
+AI agents can investigate a case quickly, but in consequential workflows **investigation is not authority**.
+
+### What goes wrong today
+
+Regulated workflows such as trade compliance, KYC/AML, insurance claims, mortgage appraisal, and e-invoicing still face a difficult choice:
+
+- **Manual reconciliation** is slow, expensive, and hard to scale.
+- **AI-only document review** can be fast, but its reasoning and decisions can be difficult to reproduce, audit, or defend.
+
+DocTrust separates those jobs.
+
+| What needs to happen | DocTrust's approach |
+|---|---|
+| Collect and ground evidence | Extract facts with source provenance |
+| Investigate missing or conflicting evidence | Let the agent investigate and extend the evidence |
+| Apply compliance policy | Evaluate against an approved, immutable Ruleset |
+| Make the runtime decision | Deterministic `PASS / REVIEW / FAIL` |
+| Handle consequential exceptions | Keep human authority outside the agent's tool surface |
+| Prove what happened later | Seal the evidence, decision, review, and Ruleset into an audit artifact |
+
+### The concrete case
+
+Shipment release makes the problem easy to see: four trade documents report a critical field, but one disagrees.
+
+```text
+Commercial Invoice / Packing List / Certificate of Origin   4,650 KG
+Bill of Lading                                              5,150 KG  ← OUTLIER
+```
+
+A naive AI workflow can summarize the discrepancy. DocTrust goes further: it **grounds the finding in source evidence, evaluates it against the approved policy, blocks the case for review, keeps the agent from self-authorizing, and preserves the final decision for audit**.
+
+### The operating model
+
+```text
+Evidence
+   ↓
+Agent investigation
+   ↓
+Frozen evidence snapshot
+   ↓
+Deterministic Ruleset
+   ↓
+PASS / REVIEW / FAIL
+   ↓
+Human authority when required
+   ↓
+Tamper-evident audit artifact
+```
+
+AI-authored rules are candidates, not governing truth: they enter through a human-gated trust funnel before reaching runtime.
+
+The agent-facing runtime is exposed through MCP (`doctrust-mcp` · `evidence-mcp`) and can be consumed by Hermes or any MCP-capable client:
+
+> **The agent investigates; DocTrust enforces the approved policy.**
 
 ---
 
 ## Architecture
 
-Two live compliance domains ship today: `income_verification` (authoring
-reference corpus) and `shipment_release` (live demo on the frozen Shipment-1047
+Two compliance domains ship today: `income_verification` (authoring reference
+corpus) and `shipment_release` (the demonstrated Shipment-1047 workflow on frozen
 PDF fixtures).
 
 Canonical agent-side interaction (verified end-to-end in Phase 5):
@@ -109,7 +163,7 @@ Signed PDF report (cryptographic binding)
 
 ## 60-Second Verification
 
-For judges and engineers who want to verify the core claims without reading the full forensic walkthrough:
+For judges and engineers who want the fastest path to the core claims, run these three checks before reading the full forensic walkthrough:
 
 **1. Ruleset integrity**
 
@@ -136,6 +190,14 @@ demo/shipment_release/runs/p6-20260825-015819-726232/denied_proof.jsonl
 ```
 
 Verifies: the MCP evidence records the attempted `request_human_review` call being rejected because the capability is absent (R29 enforced).
+
+---
+
+### Independent MCP interoperability
+
+DocTrust is also demonstrated through an independent MCP client (Goose), not only the original Hermes workflow. The separate interoperability proof uses the public DocTrust MCP implementation and verifies that Goose invoked DocTrust through MCP without shell execution.
+
+See the separate interoperability proof project for the reproducible client-side test.
 
 ---
 
@@ -189,7 +251,7 @@ Reports: `g1/G1_REPORT.md` (live extraction proof) ·
 `phase5/PHASE5_REPORT.md` (adaptive orchestration) ·
 `phase6/PHASE6_REPORT.md` (human authority).
 
-**Video provenance**: The demo composes two genuine historical executions (Phase-5 progressive evidence + Phase-6 human authority) into one narrative. Different case IDs prove they are separate runs. S08 is constructed (roadmap only). For independent verification, see `docs/DEMO_ENGINEERING_GUIDE.md`.
+**Video provenance**: The main demo composes genuine execution states from separate verified runs (Phase-5 progressive evidence + Phase-6 human authority) into one narrative. Different case IDs are expected because they are separate executions. The video does not claim one uninterrupted run. For independent verification, see `docs/DEMO_ENGINEERING_GUIDE.md`.
 
 **Audit verification**: S07 shows the sealed audit artifact. Independent verification: `docs/DEMO_ENGINEERING_GUIDE.md`.
 
@@ -229,6 +291,10 @@ The demo scripts inherit this from the shell environment. They do NOT source `.e
 > Nutrient DWS extracts structured, page-and-bbox-grounded fields from each PDF, giving DocTrust page-referenced facts instead of plausible-sounding guesses; DocTrust's Ruleset engine reconciles those facts and decides.
 
 **Adding a provider:** Implement `internal/provider.EvidenceProvider` (method `ExtractFields`) — see `internal/provider/provider.go` and the Nutrient implementation in `internal/nutrient`. No changes to DocTrust, Ruleset, evaluator, or the skill are required.
+
+### Protocol- and agent-agnostic
+
+The compliance engine is independent of the agent and transport. MCP is the demonstrated agent-facing interface today; the decision logic remains in the core Go service and deterministic evaluator rather than in the MCP layer or in a specific agent.
 
 **Adding a Ruleset:** New vertical = new Ruleset YAML + evidence mapping (e.g., KYC, insurance) on the same engine — see `rulesets/shipment_release/v1.yaml` as the template.
 
@@ -658,3 +724,10 @@ Verified-state documentation — what the current proof covers and where it ends
 - `github.com/open-policy-agent/opa` v1.4.2 (OPA SDK, reference/migration tooling)
 - `github.com/jung-kurt/gofpdf/v2` v2.17.3 (PDF generation for audit reports)
 - `gopkg.in/yaml.v3` v3.0.1 (YAML parsing for rulesets and scenarios)
+
+
+---
+
+## License
+
+[MIT](https://github.com/PithomLabs/doctrust/blob/main/LICENSE)
