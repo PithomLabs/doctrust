@@ -2,11 +2,11 @@
 
 > DocTrust is an evidence-driven compliance engine that lets AI agents investigate consequential workflows against approved policy — without letting the agent become the authority that decides compliance.
 
-**Business case:** [`BUSINESS_CASE.md`](BUSINESS_CASE.md)
-**YouTube demo:** [https://www.youtube.com/watch?v=LbNnzZoPEPw](https://www.youtube.com/watch?v=LbNnzZoPEPw)
+- **Business case:** [`BUSINESS_CASE.md`](BUSINESS_CASE.md)
+- **YouTube demo:** [https://www.youtube.com/watch?v=LbNnzZoPEPw](https://www.youtube.com/watch?v=LbNnzZoPEPw)
 
-**For judges:** start with the [60-Second Verification](#60-second-verification), then watch the YouTube demo.
-**For engineers:** the architecture, invariants, MCP surface, and verification commands below show exactly where the trust boundaries live.
+- **For judges:** start with the [60-Second Verification](#60-second-verification), then watch the YouTube demo.
+- **For engineers:** the architecture, invariants, MCP surface, and verification commands below show exactly where the trust boundaries live.
 
 
 ## Problem
